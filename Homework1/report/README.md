@@ -24,16 +24,30 @@ $$
 ### 真实解
 
 $$
--u'' = f \quad \Rightarrow \quad u(x) = \iint f(x) dx + Cx + D
+-u'' = f \quad \Rightarrow \quad u(x) = \int_{x_0}^\eta\int_{x_0}^\mu f(t) dt d\eta + Cx + D
 $$
 
 对 $ f(x) = (x-1) \sin x $ 我们有
 $$
-u(x) = \iint f(x) dx + Cx + D =
+\begin{aligned}
+u(x) &= \int_1^\eta\int_1^\mu f(t) dt d\eta + Cx + D \\
+     &= -x \sin x + \sin x - 2 \cos x + Cx + D
+\end{aligned}
 $$
 
-> TODO
-
+带入定解条件，我们得到
+$$
+\left\{
+\begin{aligned}
+&u(0) = -2 + D = 0 \Rightarrow D = 2 \\
+&u(1) = - 2 \cos 1 + C + D = 0 \Rightarrow C = -2 + 2 \cos 1\\
+\end{aligned}
+\right.
+$$
+所以解为
+$$
+u(x) = (1-x) \sin x - 2 \cos x + (-2 + 2 \cos 1) x + 2
+$$
 
 
 
@@ -103,7 +117,7 @@ K_{ij} = \int_0^1 \phi'_i(x) \phi'_j(x) dx =
 \begin{aligned}
 & 0 & | j - i | \ge 2 \\
 & -\frac{1}{h_{i+1}} + \frac{1}{h_j} & j = i + 1 \\
-&\frac{1}{h_{i+1}^2} + \frac{1}{h_{i}^2} & j = i \and j \ne 0 \and j \ne n \\
+&\frac{1}{h_{i+1}^2} + \frac{1}{h_{i}^2} & j = i \cup j \ne 0 \cup j \ne n \\
 &\frac{1}{h_{i+1}^2} & j = 0 \\
 &\frac{1}{h_{i}^2} & j = n
 
@@ -114,16 +128,7 @@ $$
 
 > 其实 $ \phi_i'(x) $ 是选定的 Sobolev 空间下的弱导数 $ D_w^1 \phi $
 
-对于 $ f(x) = (x-1) \sin x $ 来说，我们有
-$$
-\int (x-1) \sin x dx = \sin x - x \cos x + \cos x + C  \\
-
-\begin{aligned}
-F_i &= \int_0^1 f(x) \phi'_i(x) dx = \frac{1}{h_i} \int_{x_{i-1}}^{x_{i}} f(x) dx - \frac{1}{h_{i+1}} \int_{x_i}^{x_{i+1}} f(x) dx \\
-&= \frac{1}{h_i} [\sin x - x \cos x + \cos x] \bigg |^{x_i}_{x_{i-1}} - \frac{1}{h_{i+1}}[\sin x - x \cos x + \cos x] \bigg | ^{x_{i+1}}_{x_i}
-
-\end{aligned}
-$$
+$ F_i $ 的计算通过数值积分进行。
 
 ### $ V_{h2} $ 空间下的矩阵形式
 

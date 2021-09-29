@@ -32,7 +32,7 @@ class PiecewiseLinearFEM:
         assert(len(X) == n + 1)
 
         # Build K
-        K = np.zeros((n+1, n+1), dtype=np.double)
+        K = np.ndarray((n+1, n+1), dtype=np.double)
         for i in range(0, n+1):
             for j in range(i, n+1):
                 if j >= i + 2:
@@ -79,22 +79,41 @@ class PiecewiseLinearFEM:
 
         return self.U
     
-    def plot(self, n):
+    def plot(self, n, ax):
         T = np.linspace(0, 1, n)
-        res = np.zeros((n,), type=np.double)
-        for t in T:
-            left = np.floor(t / self.n)
-            right = left + 1
-            
+        res = np.zeros((n,), dtype=np.double)
+        for idx, t in enumerate(T):
+            left = math.floor(t / self.n)
+            right = math.ceil(t / self.n)
 
+            res[idx] += self.U[left] * (self.X[left + 1] - t) / (self.X[left + 1] - self.X[left])
+            
+            if left != right:
+                res[idx] += self.U[right] * (t - self.X[right - 1]) / (self.X[right] - self.X[right - 1])
+
+        ax.plot(T, res)
+
+def plot_ref():
+    ref_func = lambda x: (1-x) * math.sin(x) - 2 * math.cos(x) + (-2 + 2 * math.cos(1)) * x + 2
+
+    x = np.linspace(0, 1, 100)
+    ref = [val for val in map(ref_func, x)]
+    fig, ax = plt.subplots()
+    ax.plot(x, ref)
+    plt.show()
 
 def evaluate():
     f = lambda x: (x - 1) * math.sin(x)
 
-    for n in [20, 40, 60, 80]:
+    for n in [20]:
         linearFEM = PiecewiseLinearFEM(simpsonIntg)
         linearFEM.build_knots(n)
-        linearFEM.solve(n, f)
+        linearFEM.solve(f)
+
+        fig, ax = plt.subplots()
+        linearFEM.plot(100, ax)
+        plt.show()
 
 if __name__ == '__main__':
+    #plot_ref()
     evaluate()
