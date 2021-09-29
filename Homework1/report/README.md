@@ -103,7 +103,10 @@ K_{ij} = \int_0^1 \phi'_i(x) \phi'_j(x) dx =
 \begin{aligned}
 & 0 & | j - i | \ge 2 \\
 & -\frac{1}{h_{i+1}} + \frac{1}{h_j} & j = i + 1 \\
-&\frac{1}{h_{i+1}^2} + \frac{1}{h_{i}^2} & j = i
+&\frac{1}{h_{i+1}^2} + \frac{1}{h_{i}^2} & j = i \and j \ne 0 \and j \ne n \\
+&\frac{1}{h_{i+1}^2} & j = 0 \\
+&\frac{1}{h_{i}^2} & j = n
+
 \end{aligned}
 
 \right.
