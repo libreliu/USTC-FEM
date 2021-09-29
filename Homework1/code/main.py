@@ -39,7 +39,7 @@ class PiecewiseLinearFEM:
                     K[i, j] = K[j, i] = 0
                 elif j == i + 1:
                     # No outbound access since we only calculates upper triangular
-                    K[i, j] = K[j, i] = -( 1.0 / (X[i+1] - X[i])) + (1.0 / (X[j] - X[j-1]))
+                    K[i, j] = K[j, i] = -( 1.0 / ((X[i+1] - X[i]) ** 2))
                 elif j == i:
                     # handle cases for outbound access
                     if i == n:
@@ -55,9 +55,17 @@ class PiecewiseLinearFEM:
         F = np.zeros((n+1, ), dtype=np.double)
         for i in range(0, n+1):
             if i == 0:
-                pass
+                F[i] = self.numIntg(
+                    lambda t, i=i: f(t) * (X[i+1] - t) / (X[i+1] - X[i]),
+                    X[i],
+                    X[i+1]
+                )
             elif i == n:
-                pass
+                F[i] = self.numIntg(
+                    lambda t, i=i: f(t) * (t - X[i-1]) / (X[i] - X[i-1]),
+                    X[i-1],
+                    X[i]
+                )
             else:
                 F[i] = self.numIntg(
                     lambda t, i=i: f(t) * (t - X[i-1]) / (X[i] - X[i-1]),
@@ -75,7 +83,8 @@ class PiecewiseLinearFEM:
         self.U = np.linalg.solve(K, F)
 
         # Check result
-        assert(np.allclose(K @ self.U, F))
+        #chk = K @ self.U
+        assert(np.allclose(chk, F))
 
         return self.U
     
@@ -94,7 +103,7 @@ class PiecewiseLinearFEM:
         ax.plot(T, res)
 
 def plot_ref():
-    ref_func = lambda x: (1-x) * math.sin(x) - 2 * math.cos(x) + (-2 + 2 * math.cos(1)) * x + 2
+    ref_func = lambda x: (x-1) * math.sin(x) + 2 * math.cos(x) + (2 - 2 * math.cos(1)) * x - 2
 
     x = np.linspace(0, 1, 100)
     ref = [val for val in map(ref_func, x)]
@@ -115,5 +124,5 @@ def evaluate():
         plt.show()
 
 if __name__ == '__main__':
-    #plot_ref()
-    evaluate()
+    plot_ref()
+    #evaluate()

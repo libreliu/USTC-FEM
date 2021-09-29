@@ -24,13 +24,13 @@ $$
 ### 真实解
 
 $$
--u'' = f \quad \Rightarrow \quad u(x) = \int_{x_0}^\eta\int_{x_0}^\mu f(t) dt d\eta + Cx + D
+-u'' = f \quad \Rightarrow \quad -u(x) = \int_{x_0}^\eta\int_{x_0}^\mu f(t) dt d\eta + Cx + D
 $$
 
 对 $ f(x) = (x-1) \sin x $ 我们有
 $$
 \begin{aligned}
-u(x) &= \int_1^\eta\int_1^\mu f(t) dt d\eta + Cx + D \\
+-u(x) &= \int_1^\eta\int_1^\mu f(t) dt d\eta + Cx + D \\
      &= -x \sin x + \sin x - 2 \cos x + Cx + D
 \end{aligned}
 $$
@@ -46,7 +46,7 @@ $$
 $$
 所以解为
 $$
-u(x) = (1-x) \sin x - 2 \cos x + (-2 + 2 \cos 1) x + 2
+u(x) = (x-1) \sin x + 2 \cos x + (2 - 2 \cos 1) x - 2
 $$
 
 
@@ -116,10 +116,10 @@ K_{ij} = \int_0^1 \phi'_i(x) \phi'_j(x) dx =
 
 \begin{aligned}
 & 0 & | j - i | \ge 2 \\
-& -\frac{1}{h_{i+1}} + \frac{1}{h_j} & j = i + 1 \\
+& -\frac{1}{h_{i+1} h_j} & j = i + 1 \\
 &\frac{1}{h_{i+1}^2} + \frac{1}{h_{i}^2} & j = i \cup j \ne 0 \cup j \ne n \\
-&\frac{1}{h_{i+1}^2} & j = 0 \\
-&\frac{1}{h_{i}^2} & j = n
+&\frac{1}{h_{i+1}^2} & j = i = 0 \\
+&\frac{1}{h_{i}^2} & j = i = n
 
 \end{aligned}
 
