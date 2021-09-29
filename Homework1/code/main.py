@@ -24,6 +24,7 @@ class PiecewiseLinearFEM:
         """Solve using V_{h1} finite element space
         
         Uses n+1 knots in total, namely 0, ..., n
+        and we have n-1 basis functions in total
         """
         X = self.X
         n = self.n
@@ -32,50 +33,32 @@ class PiecewiseLinearFEM:
         assert(len(X) == n + 1)
 
         # Build K
-        K = np.ndarray((n+1, n+1), dtype=np.double)
-        for i in range(0, n+1):
-            for j in range(i, n+1):
+        K = np.ndarray((n-1, n-1), dtype=np.double)
+        for i in range(0, n-1):
+            for j in range(i, n-1):
                 if j >= i + 2:
                     K[i, j] = K[j, i] = 0
                 elif j == i + 1:
                     # No outbound access since we only calculates upper triangular
-                    K[i, j] = K[j, i] = -( 1.0 / ((X[i+1] - X[i]) ** 2))
+                    K[i, j] = K[j, i] = -( 1.0 / ((X[i+1 + 1] - X[i + 1]) ** 2))
                 elif j == i:
                     # handle cases for outbound access
-                    if i == n:
-                        K[i, j] = (1.0 / ((X[i] - X[i-1]) ** 2))
-                    elif i == 0:
-                        K[i, j] = (1.0 / ((X[i+1] - X[i])**2))
-                    else:
-                        K[i, j] = (1.0 / ((X[i+1] - X[i])**2)) + (1.0 / ((X[i] - X[i-1]) ** 2))
+                    K[i, j] = (1.0 / ((X[i+1 + 1] - X[i + 1])**2)) + (1.0 / ((X[i + 1] - X[i-1 + 1]) ** 2))
                 else:
                     assert(False)
         
         # Build F
-        F = np.zeros((n+1, ), dtype=np.double)
-        for i in range(0, n+1):
-            if i == 0:
-                F[i] = self.numIntg(
-                    lambda t, i=i: f(t) * (X[i+1] - t) / (X[i+1] - X[i]),
-                    X[i],
-                    X[i+1]
-                )
-            elif i == n:
-                F[i] = self.numIntg(
-                    lambda t, i=i: f(t) * (t - X[i-1]) / (X[i] - X[i-1]),
-                    X[i-1],
-                    X[i]
-                )
-            else:
-                F[i] = self.numIntg(
-                    lambda t, i=i: f(t) * (t - X[i-1]) / (X[i] - X[i-1]),
-                    X[i-1],
-                    X[i]
-                ) + self.numIntg(
-                    lambda t, i=i: f(t) * (X[i+1] - t) / (X[i+1] - X[i]),
-                    X[i],
-                    X[i+1]
-                )
+        F = np.zeros((n-1, ), dtype=np.double)
+        for i in range(0, n-1):
+            F[i] = self.numIntg(
+                lambda t, i=i: f(t) * (t - X[i-1 + 1]) / (X[i + 1] - X[i-1 + 1]),
+                X[i-1 + 1],
+                X[i + 1]
+            ) + self.numIntg(
+                lambda t, i=i: f(t) * (X[i+1 + 1] - t) / (X[i+1 + 1] - X[i + 1]),
+                X[i + 1],
+                X[i+1 + 1]
+            )
 
         
         # np.linalg.solve() uses _gesv LAPACK routines
@@ -83,22 +66,19 @@ class PiecewiseLinearFEM:
         self.U = np.linalg.solve(K, F)
 
         # Check result
-        #chk = K @ self.U
+        chk = K @ self.U
         assert(np.allclose(chk, F))
 
         return self.U
     
     def plot(self, n, ax):
-        T = np.linspace(0, 1, n)
-        res = np.zeros((n,), dtype=np.double)
-        for idx, t in enumerate(T):
-            left = math.floor(t / self.n)
-            right = math.ceil(t / self.n)
-
-            res[idx] += self.U[left] * (self.X[left + 1] - t) / (self.X[left + 1] - self.X[left])
-            
-            if left != right:
-                res[idx] += self.U[right] * (t - self.X[right - 1]) / (self.X[right] - self.X[right - 1])
+        T = self.X
+        res = np.zeros((self.n+1,), dtype=np.double)
+        for i in range(0, self.n + 1):
+            if i == 0 or i == self.n:
+                res[i] = 0
+            else:
+                res[i] = self.U[i - 1]
 
         ax.plot(T, res)
 
@@ -114,15 +94,15 @@ def plot_ref():
 def evaluate():
     f = lambda x: (x - 1) * math.sin(x)
 
-    for n in [20]:
+    for n in [5, 10, 20]:
         linearFEM = PiecewiseLinearFEM(simpsonIntg)
         linearFEM.build_knots(n)
         linearFEM.solve(f)
 
         fig, ax = plt.subplots()
-        linearFEM.plot(100, ax)
+        linearFEM.plot(n, ax)
         plt.show()
 
 if __name__ == '__main__':
-    plot_ref()
-    #evaluate()
+    #plot_ref()
+    evaluate()
