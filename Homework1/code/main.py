@@ -6,6 +6,11 @@ def simpsonIntg(f, x0, x1):
     """Do numeric intergral via Simpson's formula"""
     return (x1 - x0) * ((1.0/6) * f(x0) + (4.0/6) * f((x0 + x1) / 2) + (1.0/6) * f(x1))
 
+def linearIntg(f, x0, x1):
+    return (x1 - x0) * (0.5 * f(x0) + 0.5 * f(x1))
+
+
+
 class PiecewiseLinearFEM:
     def __init__(self, intg: 'function'):
         """
@@ -40,10 +45,10 @@ class PiecewiseLinearFEM:
                     K[i, j] = K[j, i] = 0
                 elif j == i + 1:
                     # No outbound access since we only calculates upper triangular
-                    K[i, j] = K[j, i] = -( 1.0 / ((X[i+1 + 1] - X[i + 1]) ** 2))
+                    K[i, j] = K[j, i] = -( 1.0 / ((X[i+1 + 1] - X[i + 1])))
                 elif j == i:
                     # handle cases for outbound access
-                    K[i, j] = (1.0 / ((X[i+1 + 1] - X[i + 1])**2)) + (1.0 / ((X[i + 1] - X[i-1 + 1]) ** 2))
+                    K[i, j] = (1.0 / ((X[i+1 + 1] - X[i + 1]))) + (1.0 / ((X[i + 1] - X[i-1 + 1])))
                 else:
                     assert(False)
         
@@ -82,25 +87,30 @@ class PiecewiseLinearFEM:
 
         ax.plot(T, res)
 
-def plot_ref():
+def plot_ref(ax):
     ref_func = lambda x: (x-1) * math.sin(x) + 2 * math.cos(x) + (2 - 2 * math.cos(1)) * x - 2
 
     x = np.linspace(0, 1, 100)
     ref = [val for val in map(ref_func, x)]
-    fig, ax = plt.subplots()
+
     ax.plot(x, ref)
     plt.show()
 
 def evaluate():
     f = lambda x: (x - 1) * math.sin(x)
 
-    for n in [5, 10, 20]:
-        linearFEM = PiecewiseLinearFEM(simpsonIntg)
+    for n in [5, 10, 20,50]:
+        linearFEM = PiecewiseLinearFEM(linearIntg)
         linearFEM.build_knots(n)
         linearFEM.solve(f)
 
         fig, ax = plt.subplots()
+        ax.set(title=f'Piecewise linear, n = {n}')
         linearFEM.plot(n, ax)
+        plot_ref(ax)
+        
+        
+
         plt.show()
 
 if __name__ == '__main__':
