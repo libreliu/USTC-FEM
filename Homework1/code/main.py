@@ -15,8 +15,85 @@ class PiccewiseQuaderaticFEM:
         self.U = None
     
     def build_knots(self, n: int):
-        self.X = np.linspace(0, 1, num=2*n-1)
+        self.X = np.linspace(0, 1, num=n+1)
+        self.n = n
+        self.h = self.X[1] - self.X[0]
+        return self.X
+    
+    def solve(self, f: 'function'):
+        X = self.X
+        n = self.n
+
+        assert(len(X) == n+1)
+        h = X[1] - X[0]
+        K = np.zeros((2*n-1, 2*n-1), dtype=np.double)
+        for i in range(0, 2*n-1):
+            for j in range(i, 2*n-1):
+                if i == j and i % 2 == 0:
+                    K[i, j] = 16 / (3 * h)
+                elif i == j and i % 2 != 0:
+                    K[i, j] = 14 / (3 * h)
+                elif j == i + 1:
+                    K[i, j] = K[j, i] = - 8.0 / (3 * h)
+                elif j == i + 2 and i % 2 == 0:
+                    K[i, j] = K[j, i] = 0
+                elif j == i + 2 and i % 2 != 0:
+                    K[i, j] = K[j, i] = -1.0 / (3 * h)
+                else:
+                    # matrix already initialized
+                    pass
         
+        F = np.zeros((2*n-1,), dtype=np.double)
+        for i in range(0, 2*n-1):
+            if i % 2 == 0:
+                iPsi = i // 2
+                print(iPsi)
+                F[i] = self.numIntg(
+                    lambda t, i=iPsi: f(t) * (-4*(t-X[i])*(t-X[i+1]) / (h**2)),
+                    X[iPsi],
+                    X[iPsi + 1]
+                )
+            else:
+                iPhi = (i + 1) // 2
+                print(iPhi)
+                F[i] = self.numIntg(
+                    lambda t, i=iPhi: f(t) * ((2*t-X[i]-X[i-1])*(t*X[i-1])/(h**2)),
+                    X[iPhi - 1],
+                    X[iPhi]
+                ) + self.numIntg(
+                    lambda t, i=iPhi: f(t) * ((2*t-X[i]-X[i+1])*(t*X[i+1])/(h**2)),
+                    X[iPhi],
+                    X[iPhi + 1]
+                )
+
+        self.U = np.linalg.solve(K, F)
+
+        chk = K @ self.U
+        assert(np.allclose(chk, F))
+
+        return self.U
+
+    def plot(self, n, ax):
+        T = np.linspace(0, 1, 2*self.n+1)
+        res = np.zeros((self.n*2+1,), dtype=np.double)
+        for i in range(0, self.n*2+1):
+            if i == 0 or i == self.n*2:
+                res[i] = 0
+            else:
+                res[i] = self.U[i - 1]
+
+        ax.scatter(T, res)
+
+        # plot the curve with n points
+        T = np.linspace(0, 1, n)
+        res = np.ndarray((n,), dtype=np.double)
+        for i in range(0, n):
+            gridCoord = i / self.h
+            leftEndpoint = math.floor(gridCoord)
+            rightEndpoint = math.ceil(gridCoord)
+
+            
+
 
 class PiecewiseLinearFEM:
     def __init__(self, intg: 'function'):
@@ -106,7 +183,7 @@ def plot_ref(ax):
 def evaluate():
     f = lambda x: (x - 1) * math.sin(x)
 
-    for n in [5, 10, 20,50]:
+    for n in [3]:
         linearFEM = PiecewiseLinearFEM(linearIntg)
         linearFEM.build_knots(n)
         linearFEM.solve(f)
@@ -116,9 +193,21 @@ def evaluate():
         linearFEM.plot(n, ax)
         plot_ref(ax)
         
-        
-
         plt.show()
+
+    #for n in [3, 5, 8, 10, 20, 40, 80]:
+    for n in [3]:
+        quadFEM = PiccewiseQuaderaticFEM(simpsonIntg)
+        quadFEM.build_knots(n)
+        quadFEM.solve(f)
+
+        fig, ax = plt.subplots()
+        ax.set(title=f'Piecewise Quadratic, n = {n}')
+        quadFEM.plot(n, ax)
+        plot_ref(ax)
+        
+        plt.show()
+
 
 if __name__ == '__main__':
     #plot_ref()
