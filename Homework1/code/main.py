@@ -9,7 +9,14 @@ def simpsonIntg(f, x0, x1):
 def linearIntg(f, x0, x1):
     return (x1 - x0) * (0.5 * f(x0) + 0.5 * f(x1))
 
-
+class PiccewiseQuaderaticFEM:
+    def __init__(self, intg: 'function'):
+        self.numIntg = intg
+        self.U = None
+    
+    def build_knots(self, n: int):
+        self.X = np.linspace(0, 1, num=2*n-1)
+        
 
 class PiecewiseLinearFEM:
     def __init__(self, intg: 'function'):
