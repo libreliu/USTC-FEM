@@ -44,7 +44,7 @@ class PiecewiseQuaderaticFEM:
                 elif j == i + 2 and i % 2 == 0:
                     K[i, j] = K[j, i] = 0
                 elif j == i + 2 and i % 2 != 0:
-                    K[i, j] = K[j, i] = -1.0 / (3 * h)
+                    K[i, j] = K[j, i] = 1.0 / (3 * h)
                 else:
                     # matrix already initialized
                     pass
