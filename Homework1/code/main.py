@@ -301,7 +301,7 @@ def evaluate():
     n_list = [1, 2, 3, 5, 8]
     fig, axs = plt.subplots(1, len(n_list))
     for idx, n in enumerate(n_list):
-        quadFEM = PiecewiseQuaderaticFEM(preciseIntg)
+        quadFEM = PiecewiseQuaderaticFEM(simpsonIntg)
         quadFEM.build_knots(n)
         quadFEM.solve(f, verbose=True)
 
