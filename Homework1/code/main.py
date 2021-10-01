@@ -53,7 +53,8 @@ class PiecewiseQuaderaticFEM:
         for i in range(0, 2*n-1):
             if i % 2 == 0:
                 iPsi = i // 2
-                print(iPsi)
+                if verbose:
+                    print(iPsi)
                 F[i] = self.numIntg(
                     lambda t, i=iPsi: f(t) * (-4*(t-X[i])*(t-X[i+1]) / (h**2)),
                     X[iPsi],
@@ -61,7 +62,8 @@ class PiecewiseQuaderaticFEM:
                 )
             else:
                 iPhi = (i + 1) // 2
-                print(iPhi)
+                if verbose:
+                    print(iPhi)
                 left = self.numIntg(
                     lambda t: f(t) * ((2*t-X[iPhi]-X[iPhi-1])*(t-X[iPhi-1])/(h**2)),
                     X[iPhi - 1],
@@ -72,11 +74,13 @@ class PiecewiseQuaderaticFEM:
                     X[iPhi],
                     X[iPhi + 1]
                 )
-                print(f"left={left} right={right}")
+                if verbose:
+                    print(f"left={left} right={right}")
                 F[i] = left + right
 
-        print("K eigs:")
-        print(np.linalg.eigvals(K))
+        if verbose:
+            print("K eigs:")
+            print(np.linalg.eigvals(K))
         self.U = np.linalg.solve(K, F)
 
         if verbose:
@@ -298,26 +302,39 @@ def evaluate():
     errs = []
 
     # for n in [3, 5, 8, 10, 20, 40, 80]:
-    n_list = [1, 2, 3, 5, 8]
+    #n_list = [1, 2, 3, 5, 8]
+    n_list = [2, 4, 8, 16, 32, 64]
     fig, axs = plt.subplots(1, len(n_list))
     for idx, n in enumerate(n_list):
         quadFEM = PiecewiseQuaderaticFEM(simpsonIntg)
         quadFEM.build_knots(n)
-        quadFEM.solve(f, verbose=True)
+        quadFEM.solve(f, verbose=False)
 
         axs[idx].set(title=f'n = {n}')
         quadFEM.plot(50, axs[idx])
         plot_ref(axs[idx])
 
         # calculate error w.r.t true value
-        # err_samples = 1000
-        # T, res = quadFEM.genSample(err_samples)
-        # resReal = np.zeros((err_samples,),dtype=np.double)
-        # for i in range(0, err_samples):
-        #     resReal[i] = ref_func(T[i])
+        err_samples = 1000
+        T, res = quadFEM.genSample(err_samples)
+        resReal = np.zeros((err_samples,),dtype=np.double)
+        for i in range(0, err_samples):
+            resReal[i] = ref_func(T[i])
 
-        # err = np.abs(resReal - res)
-        # errs.append(err)
+        err = np.abs(resReal - res)
+        errs.append(err)
+
+        err_L1 = 0
+        err_Linf = 0
+        for i in range(1, err_samples):
+            h = T[i] - T[i-1]
+            # integrate using trapz scheme
+            err_L1 += h * abs(0.5 * err[i] + 0.5 * err[i-1])
+            if err_Linf < abs(err[i]):
+                err_Linf = abs(err[i])
+        
+        print(f"quad n={n}, err_L1: {err_L1:.3e}, err_Linf: {err_Linf:.3e}")
+
     for ax in axs.flat:
         ax.label_outer()
     plt.show()
