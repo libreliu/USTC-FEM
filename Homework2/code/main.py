@@ -23,6 +23,124 @@ def preciseIntg(f, x0, x1):
     #print(f"Integrate from {x0} to {x1} yield {res[0]}, error={res[1]}")
     return res[0]
 
+class PiecewiseQuadraticFEM:
+    def __init__(self, intg: 'function'):
+        """
+        @param intg: Numerical integrater to use
+        """
+        self.numIntg = intg
+        self.U = None
+
+    def build_knots(self, n: int):
+        """Build uniform knots in generation, total n+1 knots"""
+        self.X = np.linspace(0, 1, num=n+1)
+        self.n = n
+        return self.X
+
+    def phiphiDerivIntg(self, i, j, d):
+        """Calculate \int_0^1 d(x) \phi'_i(x) \phi'_j(x) dx
+        Here we use i = 1, ..., n
+        """
+
+    def phipsiDerivIntg(self, i, j, d):
+        """Calculate \int_0^1 d(x) \phi'_i(x) \psi'_j+1/2(x) dx
+        Here we use i = 1, ..., n
+        """
+
+    def psiphiDerivIntg(self, i, j, d):
+        """Calculate \int_0^1 d(x) \psi'_i+1/2(x) \phi'_j(x) dx
+        Here we use i = 1, ..., n
+        """
+        
+    def phipsiIntg(self, i, j, c):
+        """
+        Calculate \int_0^1 c(x) \phi_i(x) \psi_j+1/2(x) dx
+        Here we use i = 1, ..., n
+        """
+
+    def psiphiIntg(self, i, j, c):
+        """
+        Calculate \int_0^1 c(x) \psi_i+1/2(x) \phi_j(x) dx
+        Here we use i = 1, ..., n
+        """
+
+    def phiphiIntg(self, i, j, c):
+        """
+        Calculate \int_0^1 c(x) \phi_i(x) \phi_j(x) dx
+        Here we use i = 1, ..., n
+        """
+        
+    def phiFIntg(self, i, f):
+        """
+        Calculate \int_0^1 f(x) \phi_i(x) dx
+        Here we use i = 1, ..., n-1
+        """
+
+    def psiFIntg(self, i, f):
+        """
+        Calculate \int_0^1 f(x) \psi_i+1/2(x) dx
+        Here we use i = 1, ..., n
+        """
+
+    def solve(self, f: 'function', c: 'function', d: 'function'):
+        """Solve using V_{h1} finite element space
+        
+        Uses n+1 knots in total, namely 0, ..., n
+        and we have n-1 basis functions in total
+        """
+        X = self.X
+        n = self.n
+
+        # Check x
+        assert(len(X) == n + 1)
+
+        # Build K
+        K = np.ndarray((n-1, n-1), dtype=np.double)
+        for i in range(0, n-1):
+            for j in range(i, n-1):
+                iPhi = (i % 2 != 0)
+                jPhi = (j % 2 != 0)
+                if iPhi and jPhi:
+                    iPhiIdx = (i+1) / 2
+                    jPhiIdx = (j+1) / 2
+                    K[j, i] = K[i, j] = self.phiphiIntg(iPhiIdx, jPhiIdx, c) + self.phiphiDerivIntg(iPhiIdx, jPhiIdx, d)
+                elif iPhi and not jPhi:
+                    iPhiIdx = (i+1) / 2
+                    jPsiIdx = j / 2
+                    K[j, i] = K[i, j] = self.phipsiIntg(iPhiIdx, jPsiIdx, c) + self.phipsiDerivIntg(iPhiIdx, jPsiIdx, d)
+                elif jPhi and not iPhi:
+                    iPsiIdx = i / 2
+                    jPhiIdx = (j+1) / 2
+                    K[j, i] = K[i, j] = self.psiphiIntg(iPsiIdx, jPhiIdx, c) + self.psiphiDerivIntg(iPsiIdx, jPhiIdx, d)
+                else:
+                    assert((not iPhi) and (not jPhi))
+                    iPsiIdx = i / 2
+                    jPsiIdx = j / 2
+                    K[j, i] = K[i, j] = self.psipsiIntg(iPsiIdx, jPsiIdx, c) + self.psipsiDerivIntg(iPsiIdx, jPsiIdx, d)
+                
+                # clear everything to avoid mistake
+                iPhiIdx = jPhiIdx = iPsiIdx = jPsiIdx = None
+        
+        np.set_printoptions(precision=3, linewidth=150)
+        print(K)
+
+        # Build F
+        F = np.zeros((n-1, ), dtype=np.double)
+        for i in range(0, n-1):
+            F[i] = self.phiFIntg(i, f)
+        
+        print(F)
+
+        # np.linalg.solve() uses _gesv LAPACK routines
+        # which uses LU factorization indeed
+        self.U = np.linalg.solve(K, F)
+
+        # Check result
+        chk = K @ self.U
+        assert(np.allclose(chk, F))
+
+        return self.U
+
 class PiecewiseLinearFEM:
     def __init__(self, intg: 'function'):
         """
@@ -39,7 +157,7 @@ class PiecewiseLinearFEM:
 
     def phiDerivIntg(self, i, j, d):
         """Calculate \int_0^1 d(x) \phi'_i(x) \phi'_j(x) dx
-        Here we use i = 0, ..., n-1, as opposed to what we use in the document (starting from 1)
+        Here we use i = 0, ..., n-2, as opposed to what we use in the document (starting from 1)
         """
         assert(i <= j)
         if j - i >= 2:
@@ -66,7 +184,7 @@ class PiecewiseLinearFEM:
     def phiIntg(self, i, j, c):
         """
         Calculate \int_0^1 c(x) \phi_i(x) \phi_j(x) dx
-        Here we use i = 0, ..., n-1, as opposed to what we use in the document (starting from 1)
+        Here we use i = 0, ..., n-2, as opposed to what we use in the document (starting from 1)
         """
         assert(i <= j)
         if j - i >= 2:
@@ -92,7 +210,7 @@ class PiecewiseLinearFEM:
     def phiFIntg(self, i, f):
         """
         Calculate \int_0^1 f(x) \phi_i(x) dx
-        Here we use i = 0, ..., n-1, as opposed to what we use in the document (starting from 1)
+        Here we use i = 0, ..., n-2, as opposed to what we use in the document (starting from 1)
         """
         return self.numIntg(
             lambda x: f(x) * (x - self.X[i]) / (self.X[i+1] - self.X[i]),
