@@ -10,6 +10,14 @@ def simpsonIntg(f, x0, x1):
 def linearIntg(f, x0, x1):
     return (x1 - x0) * (0.5 * f(x0) + 0.5 * f(x1))
 
+# Two point gauss integration
+def gaussIntg(f, x0, x1):
+    c1 = (x1 - x0) / 2
+    c2 = (x1 + x0) / 2
+    c3 = 1 / math.sqrt(3)
+    c4 = -c3
+    return c1 * f(c2 + c1 * c3) + c1 * f(c2 + c1 * c4)
+
 def preciseIntg(f, x0, x1):
     res = integrate.quad(f, x0, x1)
     #print(f"Integrate from {x0} to {x1} yield {res[0]}, error={res[1]}")
@@ -91,7 +99,7 @@ class PiecewiseLinearFEM:
             self.X[i],
             self.X[i+1]
         ) + self.numIntg(
-            lambda x: f(x) * (self.X[i+1] - x) / (self.X[i+2] - self.X[i+1]),
+            lambda x: f(x) * (self.X[i+2] - x) / (self.X[i+2] - self.X[i+1]),
             self.X[i+1],
             self.X[i+2]
         )
@@ -112,20 +120,25 @@ class PiecewiseLinearFEM:
         K = np.ndarray((n-1, n-1), dtype=np.double)
         for i in range(0, n-1):
             for j in range(i, n-1):
-                K[i, j] = self.phiIntg(i, j, c) + self.phiDerivIntg(i, j, d)
+                K[j, i] = K[i, j] = self.phiIntg(i, j, c) + self.phiDerivIntg(i, j, d)
         
+        np.set_printoptions(precision=3, linewidth=150)
+        print(K)
+
         # Build F
         F = np.zeros((n-1, ), dtype=np.double)
         for i in range(0, n-1):
             F[i] = self.phiFIntg(i, f)
         
+        print(F)
+
         # np.linalg.solve() uses _gesv LAPACK routines
         # which uses LU factorization indeed
         self.U = np.linalg.solve(K, F)
 
         # Check result
-        #chk = K @ self.U
-        #assert(np.allclose(chk, F))
+        chk = K @ self.U
+        assert(np.allclose(chk, F))
 
         return self.U
     
@@ -173,15 +186,17 @@ def plot_ref(ax, ref_func):
 
 def evaluate():
     f = lambda x: x*(x-1)*(x**2+1) - 2*(math.sin(x) + 2) - (2*x-1) * math.cos(x)
+    #f = lambda x: - math.sin(2*x + 1) - 2 * (2 + math.sin(x)) + (x-1) *x* (x**2+1)
     d = lambda x: math.sin(x) + 2
     c = lambda x: x**2 + 1
     ref_func = lambda x: x * (x-1)
 
     errs = []
-    n_list = [3, 5, 10, 20, 40, 80]
+    #n_list = [3, 5, 10, 20, 40, 80]
+    n_list = [3, 5, 10]
     fig, axs = plt.subplots(1, len(n_list))
     for idx, n in enumerate(n_list):
-        linearFEM = PiecewiseLinearFEM(simpsonIntg)
+        linearFEM = PiecewiseLinearFEM(gaussIntg)
         linearFEM.build_knots(n)
         linearFEM.solve(f, c, d)
 
