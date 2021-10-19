@@ -37,37 +37,36 @@ class PiecewiseQuadraticFEM:
         self.n = n
         return self.X
 
-    def psiDeriv(self, i):
-        return lambda x, i=i: (-4.0 / ((self.X[i+1] - self.X[i]) ** 2)) * (2 * x - (self.X[i] + self.X[i+1])) if self.X[i] <= x <= self.X[i+1] else 0
+    def psiDeriv(self, x, i):
+        return (-4.0 / ((self.X[i+1] - self.X[i]) ** 2)) * (2 * x - (self.X[i] + self.X[i+1])) if self.X[i] <= x <= self.X[i+1] else 0
 
-    def phiDeriv(self, i):
-        def compute(x, i):
-            if self.X[i-1] <= x <= self.X[i]:
-                h_i = self.X[i] - self.X[i-1]
-                return (1.0 / (h_i ** 2)) * (4 * x - (3 * self.X[i-1] + self.X[i]))
-            elif self.X[i] <= x <= self.X[i+1]:
-                h_iP1 = self.X[i+1] - self.X[i]
-                return (1.0 / (h_iP1 ** 2)) * (4 * x - (3 * self.X[i+1] + self.X[i]))
-            else:
-                return 0
-        
-        return lambda x, i=i: compute(x, i)
+    def phiDeriv(self, x, i):
+        if self.X[i-1] <= x <= self.X[i]:
+            h_i = self.X[i] - self.X[i-1]
+            return (1.0 / (h_i ** 2)) * (4 * x - (3 * self.X[i-1] + self.X[i]))
+        elif self.X[i] <= x <= self.X[i+1]:
+            h_iP1 = self.X[i+1] - self.X[i]
+            return (1.0 / (h_iP1 ** 2)) * (4 * x - (3 * self.X[i+1] + self.X[i]))
+        else:
+            return 0
 
-    def psi(self, i):
-        return lambda x, i=i: (-4.0 / ((self.X[i+1] - self.X[i]) ** 2)) * (x-self.X[i]) * (x-self.X[i+1]) if self.X[i] <= x <= self.X[i+1] else 0
+    def psi(self, x, i):
+        return (-4.0 / ((self.X[i+1] - self.X[i]) ** 2)) * (x-self.X[i]) * (x-self.X[i+1]) if self.X[i] <= x <= self.X[i+1] else 0
 
-    def phi(self, i):
-        def compute(x, i):
-            if self.X[i-1] <= x <= self.X[i]:
-                h_i = self.X[i] - self.X[i-1]
-                return (2*x-self.X[i]-self.X[i-1])*(x-self.X[i-1])/(h_i ** 2)
-            elif self.X[i] <= x <= self.X[i+1]:
-                h_iP1 = self.X[i+1] - self.X[i]
-                return (2*x-self.X[i]-self.X[i+1])*(x-self.X[i+1])/(h_iP1 ** 2)
-            else:
-                return 0
-        
-        return lambda x, i=i: compute(x, i)
+    def phi(self, x, i):
+        if self.X[i-1] <= x <= self.X[i]:
+            h_i = self.X[i] - self.X[i-1]
+            return (2*x-self.X[i]-self.X[i-1])*(x-self.X[i-1])/(h_i ** 2)
+        elif self.X[i] <= x <= self.X[i+1]:
+            h_iP1 = self.X[i+1] - self.X[i]
+            return (2*x-self.X[i]-self.X[i+1])*(x-self.X[i+1])/(h_iP1 ** 2)
+        else:
+            return 0
+
+    def cast_to_int(self, num: float):
+        num_int = int(num)
+        assert(num_int - num <= 1e-7)
+        return num_int
 
     def phiphiDerivIntg(self, i, j, d):
         """Calculate \int_0^1 d(x) \phi'_i(x) \phi'_j(x) dx
@@ -77,23 +76,19 @@ class PiecewiseQuadraticFEM:
         if j - i >= 2:
             return 0
         elif j - i == 1:
-            # h_{j} = x_{j} - x_{j-1}
-            h_j = self.X[j] - self.X[j-1]
             return self.numIntg(
-                lambda x: d(x) * (1.0 / (h_j ** 2)) * (4 * x - (3 * self.X[i+1] + self.X[i])) * (1.0 / (h_j ** 2)) * (4 * x - (3 * self.X[j-1] + self.X[j])),
+                lambda x: d(x) * self.phiDeriv(x, i) * self.phiDeriv(x, j),
                 self.X[i],
                 self.X[i+1]
             )
         else:
             assert(i == j)
-            h_j = self.X[j] - self.X[j-1]
-            h_jP1 = self.X[j+1] - self.X[j]
             return self.numIntg(
-                lambda x: d(x) * (1.0 / (h_j ** 2)) * (4 * x - (3 * self.X[j-1] + self.X[j])) * (1.0 / (h_j ** 2)) * (4 * x - (3 * self.X[j-1] + self.X[j])),
+                lambda x: d(x) * self.phiDeriv(x, i) * self.phiDeriv(x, j),
                 self.X[j-1],
                 self.X[j]
             ) + self.numIntg(
-                lambda x: d(x) * (1.0 / (h_jP1 ** 2)) * (4 * x - (3 * self.X[j+1] + self.X[j])) * (1.0 / (h_jP1 ** 2)) * (4 * x - (3 * self.X[j+1] + self.X[j])),
+                lambda x: d(x) * self.phiDeriv(x, i) * self.phiDeriv(x, j),
                 self.X[j],
                 self.X[j+1]
             )
@@ -108,10 +103,8 @@ class PiecewiseQuadraticFEM:
         else:
             assert(j == i)
             # right branch of phi'_i and psi'_j
-            h_iP1 = self.X[i+1] - self.X[i]
-            h_jP1 = self.X[j+1] - self.X[j]
             return self.numIntg(
-                lambda x: d(x) * (1.0 / (h_iP1 ** 2)) * (4 * x - (3 * self.X[i+1] + self.X[i])) * (-4.0 / (h_jP1 ** 2)) * (2 * x - (self.X[j] + self.X[j+1])),
+                lambda x: d(x) * self.phiDeriv(x, i) * self.psiDeriv(x, j),
                 self.X[i],
                 self.X[i+1]
             )
@@ -125,10 +118,8 @@ class PiecewiseQuadraticFEM:
             return 0
         elif j - i == 1:
             # whole branch of psi and left branch of phi
-            h_iP1 = self.X[i+1] - self.X[i]
-            h_j = self.X[j] - self.X[j-1]
             return self.numIntg(
-                lambda x: d(x) * (-4.0 / (h_iP1 ** 2)) * (2 * x - (self.X[i] + self.X[i+1])) * (1.0 / (h_j ** 2)) * (4 * x - (3 * self.X[j-1] + self.X[j])),
+                lambda x: d(x) * self.psiDeriv(x, i) * self.phiDeriv(x, j),
                 self.X[i],
                 self.X[i+1]
             )
@@ -145,41 +136,114 @@ class PiecewiseQuadraticFEM:
         if j - i >= 2:
             return 0
         elif j - i == 1:
-            h_iP1 = self.X[i+1] - self.X[i]
-            h_j = self.X[j] - self.X[j-1]
             return self.numIntg(
-                lambda x: c(x) * (1.0 / (h_iP1 ** 2)) * ((2*x-self.X[i]-self.X[i+1]) * (x-self.X[i+1])) * (1.0 / (h_j ** 2)) * ((2*x-self.X[j]-self.X[j-1]) * (x-self.X[j-1])),
+                lambda x: c(x) * self.phi(x, i) * self.phi(x, j),
                 self.X[i],
                 self.X[i+1]
             )
         else:
+            # !!CHECK!!
             assert(j == i)
-
+            return self.numIntg(
+                lambda x: c(x) * self.phi(x, i) * self.phi(x, j),
+                self.X[i-1],
+                self.X[i]
+            ) + self.numIntg(
+                lambda x: c(x) * self.phi(x, i) * self.phi(x, j),
+                self.X[i],
+                self.X[i+1]
+            )
         
     def phipsiIntg(self, i, j, c):
         """
         Calculate \int_0^1 c(x) \phi_i(x) \psi_j+1/2(x) dx
         Here we use i = 1, ..., n
         """
-
+        assert(j >= i)
+        if j - i >= 1:
+            return 0
+        else:
+            assert(j == i)
+            return self.numIntg(
+                lambda x: c(x) * self.phi(x, i) * self.psi(x, j),
+                self.X[i],
+                self.X[i+1]
+            )
 
     def psiphiIntg(self, i, j, c):
         """
         Calculate \int_0^1 c(x) \psi_i+1/2(x) \phi_j(x) dx
         Here we use i = 1, ..., n
         """
-        
+        assert(j >= i)
+        if j - i >= 2:
+            return 0
+        elif j - i == 1:
+            return self.numIntg(
+                lambda x: c(x) * self.psi(x, i) * self.phi(x, j),
+                self.X[i],
+                self.X[i+1]
+            )
+        else:
+            assert(False)
+    
+    def psipsiIntg(self, i, j, c):
+        """
+        Calculate \int_0^1 c(x) \psi_i+1/2(x) \psi_j+1/2(x) dx
+        Here we use i = 1, ..., n
+        """
+        assert(j >= i)
+        if j - i >= 1:
+            return 0
+        else:
+            assert(j == i)
+            return self.numIntg(
+                lambda x: c(x) * self.psi(x, i) * self.psi(x, j),
+                self.X[i],
+                self.X[i+1]
+            )
+
+    def psipsiDerivIntg(self, i, j, c):
+        """
+        Calculate \int_0^1 c(x) \psi'_i+1/2(x) \psi'_j+1/2(x) dx
+        Here we use i = 1, ..., n
+        """
+        assert(j >= i)
+        if j - i >= 1:
+            return 0
+        else:
+            assert(j == i)
+            return self.numIntg(
+                lambda x: c(x) * self.psiDeriv(x, i) * self.psiDeriv(x, j),
+                self.X[i],
+                self.X[i+1]
+            )
+
     def phiFIntg(self, i, f):
         """
         Calculate \int_0^1 f(x) \phi_i(x) dx
         Here we use i = 1, ..., n-1
         """
+        return self.numIntg(
+            lambda x: f(x) * self.phi(x, i),
+            self.X[i-1],
+            self.X[i]
+        ) + self.numIntg(
+            lambda x: f(x) * self.phi(x, i),
+            self.X[i],
+            self.X[i+1]
+        )
 
     def psiFIntg(self, i, f):
         """
         Calculate \int_0^1 f(x) \psi_i+1/2(x) dx
         Here we use i = 1, ..., n
         """
+        return self.numIntg(
+            lambda x: f(x) * self.psi(x, i),
+            self.X[i],
+            self.X[i+1]
+        )
 
     def solve(self, f: 'function', c: 'function', d: 'function'):
         """Solve using V_{h1} finite element space
@@ -194,27 +258,27 @@ class PiecewiseQuadraticFEM:
         assert(len(X) == n + 1)
 
         # Build K
-        K = np.ndarray((n-1, n-1), dtype=np.double)
-        for i in range(0, n-1):
-            for j in range(i, n-1):
+        K = np.ndarray((2*n-1, 2*n-1), dtype=np.double)
+        for i in range(0, 2*n-1):
+            for j in range(i, 2*n-1):
                 iPhi = (i % 2 != 0)
                 jPhi = (j % 2 != 0)
                 if iPhi and jPhi:
-                    iPhiIdx = (i+1) / 2
-                    jPhiIdx = (j+1) / 2
+                    iPhiIdx = self.cast_to_int((i+1) / 2)
+                    jPhiIdx = self.cast_to_int((j+1) / 2)
                     K[j, i] = K[i, j] = self.phiphiIntg(iPhiIdx, jPhiIdx, c) + self.phiphiDerivIntg(iPhiIdx, jPhiIdx, d)
                 elif iPhi and not jPhi:
-                    iPhiIdx = (i+1) / 2
-                    jPsiIdx = j / 2
+                    iPhiIdx = self.cast_to_int((i+1) / 2)
+                    jPsiIdx = self.cast_to_int(j / 2)
                     K[j, i] = K[i, j] = self.phipsiIntg(iPhiIdx, jPsiIdx, c) + self.phipsiDerivIntg(iPhiIdx, jPsiIdx, d)
                 elif jPhi and not iPhi:
-                    iPsiIdx = i / 2
-                    jPhiIdx = (j+1) / 2
+                    iPsiIdx = self.cast_to_int(i / 2)
+                    jPhiIdx = self.cast_to_int((j+1) / 2)
                     K[j, i] = K[i, j] = self.psiphiIntg(iPsiIdx, jPhiIdx, c) + self.psiphiDerivIntg(iPsiIdx, jPhiIdx, d)
                 else:
                     assert((not iPhi) and (not jPhi))
-                    iPsiIdx = i / 2
-                    jPsiIdx = j / 2
+                    iPsiIdx = self.cast_to_int(i / 2)
+                    jPsiIdx = self.cast_to_int(j / 2)
                     K[j, i] = K[i, j] = self.psipsiIntg(iPsiIdx, jPsiIdx, c) + self.psipsiDerivIntg(iPsiIdx, jPsiIdx, d)
                 
                 # clear everything to avoid mistake
@@ -224,9 +288,15 @@ class PiecewiseQuadraticFEM:
         print(K)
 
         # Build F
-        F = np.zeros((n-1, ), dtype=np.double)
-        for i in range(0, n-1):
-            F[i] = self.phiFIntg(i, f)
+        F = np.zeros((2*n-1, ), dtype=np.double)
+        for i in range(0, 2*n-1):
+            iPhi = (i % 2 != 0)
+            if iPhi:
+                iPhiIdx = self.cast_to_int((i+1) / 2)
+                F[i] = self.phiFIntg(iPhiIdx, f)
+            else:
+                iPsiIdx = self.cast_to_int(i / 2)
+                F[i] = self.psiFIntg(iPsiIdx, f)
         
         print(F)
 
@@ -239,6 +309,53 @@ class PiecewiseQuadraticFEM:
         assert(np.allclose(chk, F))
 
         return self.U
+
+    def genSample(self, n):
+        T = np.linspace(0, 1, n)
+        res = np.zeros((n,), dtype=np.double)
+        self.h = self.X[1] - self.X[0]
+        for i in range(0, n):
+            t = T[i]
+            gridCoord = t / self.h
+            leftEndpoint = math.floor(gridCoord)
+            rightEndpoint = math.ceil(gridCoord)
+
+            # right phi arm
+            if leftEndpoint < self.n and leftEndpoint >= 1:
+                res[i] += self.U[leftEndpoint * 2 - 1] * ((2*t-self.X[leftEndpoint]-self.X[leftEndpoint+1])*(t-self.X[leftEndpoint+1])/(self.h**2))
+
+            # left phi arm
+            if leftEndpoint != rightEndpoint and rightEndpoint > 0 and rightEndpoint < self.n:
+                # right phi
+                res[i] += self.U[rightEndpoint * 2 - 1] * ((2*t-self.X[rightEndpoint]-self.X[rightEndpoint-1])*(t-self.X[rightEndpoint-1])/(self.h**2))
+
+            # psi in [left, right]
+            if leftEndpoint < self.n:
+                res[i] += self.U[leftEndpoint * 2] * (-4*(t-self.X[leftEndpoint])*(t-self.X[leftEndpoint+1]) / (self.h**2))
+        
+        return (T, res)
+
+    def plot(self, n, ax, verbose=False):
+        T = np.linspace(0, 1, 2*self.n+1)
+        res = np.zeros((self.n*2+1,), dtype=np.double)
+        for i in range(0, self.n*2+1):
+            if i == 0 or i == self.n*2:
+                res[i] = 0
+            else:
+                res[i] = self.U[i - 1]
+
+        ax.scatter(T, res)
+
+        # plot the curve with n points
+        T, res = self.genSample(n)
+        
+        if verbose:
+            print("T:") 
+            print(T)
+            print("res:")
+            print(res)
+
+        ax.plot(T, res)
 
 class PiecewiseLinearFEM:
     def __init__(self, intg: 'function'):
@@ -451,6 +568,29 @@ def evaluate():
         ax.plot(T, err)
     plt.show()
 
+
+    # -- quad fem --
+    # d = lambda x: 1
+    # c = lambda x: 1
+
+    # f = lambda x: (x - 1) * math.sin(x)
+    # ref_func = lambda x: (x-1) * math.sin(x) + 2 * math.cos(x) + (2 - 2 * math.cos(1)) * x - 2
+
+    n_list = [2, 4, 8, 16, 32, 64]
+    #n_list = [2, 4]
+    fig, axs = plt.subplots(1, len(n_list))
+    for idx, n in enumerate(n_list):
+        quadFEM = PiecewiseQuadraticFEM(gaussIntg)
+        quadFEM.build_knots(n)
+        quadFEM.solve(f, c, d)
+
+        axs[idx].set(title=f'n = {n}')
+        quadFEM.plot(50, axs[idx])
+        plot_ref(axs[idx], ref_func)
+
+    for ax in axs.flat:
+        ax.label_outer()
+    plt.show()
 
 if __name__ == '__main__':
     #plot_ref()
