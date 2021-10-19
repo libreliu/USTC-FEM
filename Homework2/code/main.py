@@ -37,20 +37,124 @@ class PiecewiseQuadraticFEM:
         self.n = n
         return self.X
 
+    def psiDeriv(self, i):
+        return lambda x, i=i: (-4.0 / ((self.X[i+1] - self.X[i]) ** 2)) * (2 * x - (self.X[i] + self.X[i+1])) if self.X[i] <= x <= self.X[i+1] else 0
+
+    def phiDeriv(self, i):
+        def compute(x, i):
+            if self.X[i-1] <= x <= self.X[i]:
+                h_i = self.X[i] - self.X[i-1]
+                return (1.0 / (h_i ** 2)) * (4 * x - (3 * self.X[i-1] + self.X[i]))
+            elif self.X[i] <= x <= self.X[i+1]:
+                h_iP1 = self.X[i+1] - self.X[i]
+                return (1.0 / (h_iP1 ** 2)) * (4 * x - (3 * self.X[i+1] + self.X[i]))
+            else:
+                return 0
+        
+        return lambda x, i=i: compute(x, i)
+
+    def psi(self, i):
+        return lambda x, i=i: (-4.0 / ((self.X[i+1] - self.X[i]) ** 2)) * (x-self.X[i]) * (x-self.X[i+1]) if self.X[i] <= x <= self.X[i+1] else 0
+
+    def phi(self, i):
+        def compute(x, i):
+            if self.X[i-1] <= x <= self.X[i]:
+                h_i = self.X[i] - self.X[i-1]
+                return (2*x-self.X[i]-self.X[i-1])*(x-self.X[i-1])/(h_i ** 2)
+            elif self.X[i] <= x <= self.X[i+1]:
+                h_iP1 = self.X[i+1] - self.X[i]
+                return (2*x-self.X[i]-self.X[i+1])*(x-self.X[i+1])/(h_iP1 ** 2)
+            else:
+                return 0
+        
+        return lambda x, i=i: compute(x, i)
+
     def phiphiDerivIntg(self, i, j, d):
         """Calculate \int_0^1 d(x) \phi'_i(x) \phi'_j(x) dx
         Here we use i = 1, ..., n
         """
+        assert(i <= j)
+        if j - i >= 2:
+            return 0
+        elif j - i == 1:
+            # h_{j} = x_{j} - x_{j-1}
+            h_j = self.X[j] - self.X[j-1]
+            return self.numIntg(
+                lambda x: d(x) * (1.0 / (h_j ** 2)) * (4 * x - (3 * self.X[i+1] + self.X[i])) * (1.0 / (h_j ** 2)) * (4 * x - (3 * self.X[j-1] + self.X[j])),
+                self.X[i],
+                self.X[i+1]
+            )
+        else:
+            assert(i == j)
+            h_j = self.X[j] - self.X[j-1]
+            h_jP1 = self.X[j+1] - self.X[j]
+            return self.numIntg(
+                lambda x: d(x) * (1.0 / (h_j ** 2)) * (4 * x - (3 * self.X[j-1] + self.X[j])) * (1.0 / (h_j ** 2)) * (4 * x - (3 * self.X[j-1] + self.X[j])),
+                self.X[j-1],
+                self.X[j]
+            ) + self.numIntg(
+                lambda x: d(x) * (1.0 / (h_jP1 ** 2)) * (4 * x - (3 * self.X[j+1] + self.X[j])) * (1.0 / (h_jP1 ** 2)) * (4 * x - (3 * self.X[j+1] + self.X[j])),
+                self.X[j],
+                self.X[j+1]
+            )
 
     def phipsiDerivIntg(self, i, j, d):
         """Calculate \int_0^1 d(x) \phi'_i(x) \psi'_j+1/2(x) dx
         Here we use i = 1, ..., n
         """
+        assert(i <= j)
+        if j - i >= 1:
+            return 0
+        else:
+            assert(j == i)
+            # right branch of phi'_i and psi'_j
+            h_iP1 = self.X[i+1] - self.X[i]
+            h_jP1 = self.X[j+1] - self.X[j]
+            return self.numIntg(
+                lambda x: d(x) * (1.0 / (h_iP1 ** 2)) * (4 * x - (3 * self.X[i+1] + self.X[i])) * (-4.0 / (h_jP1 ** 2)) * (2 * x - (self.X[j] + self.X[j+1])),
+                self.X[i],
+                self.X[i+1]
+            )
 
     def psiphiDerivIntg(self, i, j, d):
         """Calculate \int_0^1 d(x) \psi'_i+1/2(x) \phi'_j(x) dx
         Here we use i = 1, ..., n
         """
+        assert(i <= j)
+        if j - i >= 2:
+            return 0
+        elif j - i == 1:
+            # whole branch of psi and left branch of phi
+            h_iP1 = self.X[i+1] - self.X[i]
+            h_j = self.X[j] - self.X[j-1]
+            return self.numIntg(
+                lambda x: d(x) * (-4.0 / (h_iP1 ** 2)) * (2 * x - (self.X[i] + self.X[i+1])) * (1.0 / (h_j ** 2)) * (4 * x - (3 * self.X[j-1] + self.X[j])),
+                self.X[i],
+                self.X[i+1]
+            )
+        else:
+            assert(False)
+
+
+    def phiphiIntg(self, i, j, c):
+        """
+        Calculate \int_0^1 c(x) \phi_i(x) \phi_j(x) dx
+        Here we use i = 1, ..., n
+        """
+        assert(j >= i)
+        if j - i >= 2:
+            return 0
+        elif j - i == 1:
+            h_iP1 = self.X[i+1] - self.X[i]
+            h_j = self.X[j] - self.X[j-1]
+            return self.numIntg(
+                lambda x: c(x) * (1.0 / (h_iP1 ** 2)) * ((2*x-self.X[i]-self.X[i+1]) * (x-self.X[i+1])) * (1.0 / (h_j ** 2)) * ((2*x-self.X[j]-self.X[j-1]) * (x-self.X[j-1])),
+                self.X[i],
+                self.X[i+1]
+            )
+        else:
+            assert(j == i)
+
         
     def phipsiIntg(self, i, j, c):
         """
@@ -58,15 +162,10 @@ class PiecewiseQuadraticFEM:
         Here we use i = 1, ..., n
         """
 
+
     def psiphiIntg(self, i, j, c):
         """
         Calculate \int_0^1 c(x) \psi_i+1/2(x) \phi_j(x) dx
-        Here we use i = 1, ..., n
-        """
-
-    def phiphiIntg(self, i, j, c):
-        """
-        Calculate \int_0^1 c(x) \phi_i(x) \phi_j(x) dx
         Here we use i = 1, ..., n
         """
         
