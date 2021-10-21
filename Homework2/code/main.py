@@ -571,7 +571,7 @@ def evaluate():
 
     # -- quad fem --
     # d = lambda x: 1
-    # c = lambda x: 1
+    # c = lambda x: 0
 
     # f = lambda x: (x - 1) * math.sin(x)
     # ref_func = lambda x: (x-1) * math.sin(x) + 2 * math.cos(x) + (2 - 2 * math.cos(1)) * x - 2
