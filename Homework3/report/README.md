@@ -39,7 +39,31 @@ $$
 带入定解条件得到
 
 $$
-u(x) = - \frac{1/2 + \epsilon}{\epsilon(e^{1/\epsilon} - 1)} \epsilon e^{x/ \epsilon} + \frac{1}{2} x^2 + \epsilon x + \frac{1/2 + \epsilon}{e^{1/\epsilon} - 1} 
+\begin{aligned}
+u(x) &= - \frac{1/2 + \epsilon}{\epsilon(e^{1/\epsilon} - 1)} \epsilon e^{x/ \epsilon} + \frac{1}{2} x^2 + \epsilon x + \frac{1/2 + \epsilon}{e^{1/\epsilon} - 1} \\
+&= \frac{1}{2} x^2 + \epsilon x - \frac{(1 + 2 \epsilon)(1-e^{x/\epsilon})}{2(1-e^{1/\epsilon})}
+\end{aligned}
+$$
+
+### 当 $ \epsilon $ 很小时候的处理
+
+$\epsilon$ 很小的时候， $e^{1/\epsilon}$ 很容易就会变成 NaN..
+
+不过，
+
+$$
+\lim_{\epsilon \to 0} \frac{(1-e^{x/\epsilon})}{(1-e^{1/\epsilon})} = \lim_{\epsilon \to 0} x e^{\frac{x-1}{\epsilon}} = 0 \quad ( x \le 1 )
+$$
+
+所以不妨进行一些近似：
+
+$$
+\begin{aligned}
+\frac{(1 + 2 \epsilon)(1-e^{x/\epsilon})}{2(1-e^{1/\epsilon})} &= \frac{(1 + 2 \epsilon)}{2} \frac{(1-e^{x/\epsilon})}{(1-e^{1/\epsilon})}\\
+&\approx \frac{(1 + 2 \epsilon)}{2} \frac{e^{x/\epsilon}}{e^{1/\epsilon}} \\
+&= \frac{(1 + 2 \epsilon)}{2} e^{(x-1)/\epsilon}
+
+\end{aligned}
 $$
 
 ### 变分
@@ -106,3 +130,6 @@ $$
 
 K_{ij} = \epsilon\int_0^1 \phi_j'(x) \phi_i'(x) dx + \int_0^1 \phi_j'(x) \phi_i(x) dx
 $$
+
+## （面向初学者的超详细）运行指南
+

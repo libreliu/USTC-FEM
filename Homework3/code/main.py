@@ -50,7 +50,11 @@ class PiecewiseLinearFEM:
         """Build shinshkin knots"""
         tau = 1 - 2 * epsilon * math.log(N)
         assert(tau < 1 and tau > 0)
-        
+        leftGrid = np.linspace(0, tau, num=n_respective+1)
+        rightGrid = np.linspace(tau, 1, num=n_respective+1)
+        self.X = np.hstack([leftGrid, rightGrid[1:]])
+        self.n = 2 * n_respective
+        assert(len(self.X) == self.n + 1)
         
     def phiDeriv(self, x, i):
         if self.X[i-1] <= x <= self.X[i]:
@@ -63,6 +67,7 @@ class PiecewiseLinearFEM:
             return 0
 
     def phi(self, x, i):
+        assert(1 <= i <= self.n - 1)
         if self.X[i-1] <= x <= self.X[i]:
             h_i = self.X[i] - self.X[i-1]
             return (x - self.X[i-1]) / h_i
@@ -177,7 +182,7 @@ class PiecewiseLinearFEM:
         # Build F
         F = np.zeros((n-1, ), dtype=np.double)
         for i in range(0, n-1):
-            F[i] = self.phiFIntg(i, f)
+            F[i] = self.phiFIntg(i+1, f)
         
         #print(F)
 
@@ -194,20 +199,10 @@ class PiecewiseLinearFEM:
     def genSample(self, n):
         T = np.linspace(0, 1, n)
         res = np.zeros((n,), dtype=np.double)
-        h = self.X[1] - self.X[0]
         for i in range(0, n):
             t = T[i]
-            gridCoord = t / h
-            leftEndpoint = math.floor(gridCoord)
-            rightEndpoint = math.ceil(gridCoord)
-
-            if leftEndpoint > 0 and leftEndpoint < self.n:
-                # right arm of left nodal basis
-                res[i] += self.U[leftEndpoint - 1] * ((self.X[leftEndpoint + 1] - t) / h)
-
-            if rightEndpoint > 0 and rightEndpoint < self.n and leftEndpoint != rightEndpoint:
-                # left arm of right nodal basis
-                res[i] += self.U[rightEndpoint - 1] * ((t - self.X[rightEndpoint - 1]) / h)
+            for j in range(1, self.n):
+                res[i] += self.U[j - 1] * self.phi(t, j)
         
         return (T, res)
 
@@ -233,75 +228,24 @@ def plot_ref(ax, ref_func):
 
     ax.plot(x, ref)
 
-def evaluate(f, d, c, ref_func, n_list, fem_method, integrator):
+def evaluate(use_shishkin: bool, n_list, epsilon):
+    f = lambda x: x
+    if epsilon >= 1e-2:
+        ref_func = lambda x: -(0.5+epsilon)/(epsilon*(math.exp(1/epsilon)-1))*epsilon*math.exp(x/epsilon) + 0.5*x**2 + epsilon*x + (0.5+epsilon)/(math.exp(1/epsilon)-1)
+    else:
+        ref_func = lambda x:  0.5*x**2 + epsilon*x - (1+2*epsilon)/2*math.exp((x-1)/epsilon)
+
     fig, axs = plt.subplots(1, len(n_list))
     errs = []
-    err_L1s = []
-    err_Linfs = []
-    for idx, n in enumerate(n_list):
-        linearFEM = fem_method(integrator)
-        linearFEM.build_knots(n)
-        linearFEM.solve(f, c, d)
-
-        axs[idx].set(title=f'n = {n}')
-        linearFEM.plot(50, axs[idx])
-        plot_ref(axs[idx], ref_func)
-
-        # calculate error w.r.t true value
-        err_samples = 1000
-        T, res = linearFEM.genSample(err_samples)
-        resReal = np.zeros((err_samples,),dtype=np.double)
-        for i in range(0, err_samples):
-            resReal[i] = ref_func(T[i])
-
-        err = np.abs(resReal - res)
-        errs.append(err)
-
-        err_L1 = 0
-        err_Linf = 0
-        for i in range(1, err_samples):
-            h = T[i] - T[i-1]
-            # integrate using trapz scheme
-            err_L1 += h * abs(0.5 * err[i] + 0.5 * err[i-1])
-            if err_Linf < abs(err[i]):
-                err_Linf = abs(err[i])
-        
-        print(f"{fem_method.__name__}: n={n}, err_L1: {err_L1:.3e}, err_Linf: {err_Linf:.3e}")
-        err_L1s.append(err_L1)
-        err_Linfs.append(err_Linf)
-    
-    for idx, n in enumerate(n_list):
-        err_Linf_order = 0 if idx == 0 else math.log(err_Linfs[idx - 1] / err_Linfs[idx], n_list[idx] / n_list[idx-1])
-        err_L1_order = 0 if idx == 0 else math.log(err_L1s[idx - 1] / err_L1s[idx], n_list[idx] / n_list[idx-1])
-
-        print(f"{n} {err_L1s[idx]:.3e} {err_Linfs[idx]:.3e} {err_Linf_order:.5e} {err_L1_order:.5e}")
-    
-    for ax in axs.flat:
-        ax.label_outer()
-    plt.show()
-
-    fig, ax = plt.subplots()
-    for err in errs:
-        ax.plot(T, err)
-    plt.show()
-
-def evaluate_old():
-    f = lambda x: x*(x-1)*(x**2+1) - 2*(math.sin(x) + 2) - (2*x-1) * math.cos(x)
-    #f = lambda x: - math.sin(2*x + 1) - 2 * (2 + math.sin(x)) + (x-1) *x* (x**2+1)
-    d = lambda x: math.sin(x) + 2
-    c = lambda x: x**2 + 1
-    ref_func = lambda x: x * (x-1)
-
-    errs = []
-    #n_list = [3, 5, 10, 20, 40, 80]
-    n_list = [3, 5, 10, 20, 40, 80]
-    fig, axs = plt.subplots(1, len(n_list))
     err_L1s = []
     err_Linfs = []
     for idx, n in enumerate(n_list):
         linearFEM = PiecewiseLinearFEM(gaussIntg)
-        linearFEM.build_knots(n)
-        linearFEM.solve(f, c, d)
+        if use_shishkin:
+            linearFEM.build_shishkin_knots(n, epsilon, n // 2)
+        else:
+            linearFEM.build_knots(n)
+        linearFEM.solve(f, epsilon)
 
         axs[idx].set(title=f'n = {n}')
         linearFEM.plot(50, axs[idx])
@@ -326,7 +270,7 @@ def evaluate_old():
             if err_Linf < abs(err[i]):
                 err_Linf = abs(err[i])
         
-        print(f"linear n={n}, err_L1: {err_L1:.3e}, err_Linf: {err_Linf:.3e}")
+        print(f"{PiecewiseLinearFEM.__name__}: n={n}, err_L1: {err_L1:.3e}, err_Linf: {err_Linf:.3e}")
         err_L1s.append(err_L1)
         err_Linfs.append(err_Linf)
     
@@ -336,72 +280,6 @@ def evaluate_old():
 
         print(f"{n} {err_L1s[idx]:.3e} {err_Linfs[idx]:.3e} {err_Linf_order:.5e} {err_L1_order:.5e}")
     
-    for ax in axs.flat:
-        ax.label_outer()
-    plt.show()
-
-    fig, ax = plt.subplots()
-    for err in errs:
-        ax.plot(T, err)
-    plt.show()
-
-
-    # -- quad fem --
-    errs = []
-    err_L1s = []
-    err_Linfs = []
-
-    # d = lambda x: 1
-    # c = lambda x: 0
-
-    #f = lambda x: (x-1)*math.sin(x)*(x**2+math.sin(x)+3)-(x-1)*math.cos(x)**2-(3*math.sin(x)+4)*math.cos(x)
-    #ref_func = lambda x: (x-1)*math.sin(x)
-    # f = lambda x: (x - 1) * math.sin(x)
-    # ref_func = lambda x: (x-1) * math.sin(x) + 2 * math.cos(x) + (2 - 2 * math.cos(1)) * x - 2
-
-    #n_list = [2, 4, 8, 16, 32, 64]
-    
-    n_list = [2, 4]
-    fig, axs = plt.subplots(1, len(n_list))
-    for idx, n in enumerate(n_list):
-        quadFEM = PiecewiseQuadraticFEM(gaussIntg)
-        #quadFEM = PiecewiseQuadraticFEM(intgWrapper(gaussIntg, preciseIntg))
-        quadFEM.build_knots(n)
-        quadFEM.solve(f, c, d)
-
-        axs[idx].set(title=f'n = {n}')
-        quadFEM.plot(1000, axs[idx])
-        plot_ref(axs[idx], ref_func)
-       
-        # calculate error w.r.t true value
-        err_samples = 4000
-        T, res = quadFEM.genSample(err_samples)
-        resReal = np.zeros((err_samples,),dtype=np.double)
-        for i in range(0, err_samples):
-            resReal[i] = ref_func(T[i])
-
-        err = np.abs(resReal - res)
-        errs.append(err)
-
-        err_L1 = 0
-        err_Linf = 0
-        for i in range(1, err_samples):
-            h = T[i] - T[i-1]
-            # integrate using trapz scheme
-            err_L1 += h * abs(0.5 * err[i] + 0.5 * err[i-1])
-            if err_Linf < abs(err[i]):
-                err_Linf = abs(err[i])
-        
-        print(f"quad n={n}, err_L1: {err_L1:.3e}, err_Linf: {err_Linf:.3e}")
-        err_L1s.append(err_L1)
-        err_Linfs.append(err_Linf)
-    
-    for idx, n in enumerate(n_list):
-        err_Linf_order = 0 if idx == 0 else math.log(err_Linfs[idx - 1] / err_Linfs[idx], n_list[idx] / n_list[idx-1]) 
-        err_L1_order = 0 if idx == 0 else math.log(err_L1s[idx - 1] / err_L1s[idx], n_list[idx] / n_list[idx-1])
-
-        print(f"{n} {err_L1s[idx]:.3e} {err_Linfs[idx]:.3e} {err_Linf_order:.5e} {err_L1_order:.5e}")
-
     for ax in axs.flat:
         ax.label_outer()
     plt.show()
@@ -413,11 +291,11 @@ def evaluate_old():
 
 if __name__ == '__main__':
     #plot_ref()
-    f = lambda x: x*(x-1)*(x**2+1) - 2*(math.sin(x) + 2) - (2*x-1) * math.cos(x)
-    d = lambda x: math.sin(x) + 2
-    c = lambda x: x**2 + 1
-    ref_func = lambda x: x * (x-1)
-    evaluate(f, d, c, ref_func, [2,4,8,16,32,64,128], PiecewiseLinearFEM, gaussIntg)
     
-    f = lambda x: (x-1)*math.sin(x)*(x**2+math.sin(x)+3)-(x-1)*math.cos(x)**2-(3*math.sin(x)+4)*math.cos(x)
-    ref_func = lambda x: (x-1)*math.sin(x)
+    for eps in [1e-1, 1e-3, 1e-5, 1e-7]:
+        print(f"==== eps={eps}, uniform ====")
+        evaluate(False, [2,4,8,16,32], eps)
+        print("===================================")
+        print(f"==== eps={eps}, shishkin ====")
+        evaluate(True, [2,4,8,16,32], eps)
+        print("===================================")
