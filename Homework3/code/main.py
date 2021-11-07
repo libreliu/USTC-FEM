@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
-import scipy.integrate as integrate
+#import scipy.integrate as integrate
 
 def simpsonIntg(f, x0, x1):
     """Do numeric intergral via Simpson's formula"""
@@ -235,7 +235,7 @@ def evaluate(use_shishkin: bool, n_list, epsilon):
     else:
         ref_func = lambda x:  0.5*x**2 + epsilon*x - (1+2*epsilon)/2*math.exp((x-1)/epsilon)
 
-    fig, axs = plt.subplots(1, len(n_list))
+    fig, axs = plt.subplots(1, len(n_list), figsize=(17,3))
     errs = []
     err_L1s = []
     err_Linfs = []
@@ -270,32 +270,43 @@ def evaluate(use_shishkin: bool, n_list, epsilon):
             if err_Linf < abs(err[i]):
                 err_Linf = abs(err[i])
         
-        print(f"{PiecewiseLinearFEM.__name__}: n={n}, err_L1: {err_L1:.3e}, err_Linf: {err_Linf:.3e}")
+        #print(f"{PiecewiseLinearFEM.__name__}: n={n}, err_L1: {err_L1:.3e}, err_Linf: {err_Linf:.3e}")
         err_L1s.append(err_L1)
         err_Linfs.append(err_Linf)
-    
+
+    print("| N | $ L^1 $ error | order | $ L^\infty $ error | order |")    
+    print("| - | ------------- | ----- | ------------------ | ----- |")
     for idx, n in enumerate(n_list):
         err_Linf_order = 0 if idx == 0 else math.log(err_Linfs[idx - 1] / err_Linfs[idx], n_list[idx] / n_list[idx-1])
         err_L1_order = 0 if idx == 0 else math.log(err_L1s[idx - 1] / err_L1s[idx], n_list[idx] / n_list[idx-1])
 
-        print(f"{n} {err_L1s[idx]:.3e} {err_Linfs[idx]:.3e} {err_Linf_order:.5e} {err_L1_order:.5e}")
+        print(f"|{n}|{err_L1s[idx]:.3e}|{err_L1_order:.5e}|{err_Linfs[idx]:.3e}|{err_Linf_order:.5e}|")
     
+    print("")
+    print("下面为此时解的情况：")
+    print(f"![](Homework3.assets/eps_{eps}_{'shishkin' if use_shishkin else 'uniform'}.png)")
+    print("下面为此时误差的情况：")
+    print(f"![](Homework3.assets/eps_{eps}_{'shishkin' if use_shishkin else 'uniform'}_errors.png)")
+
+
     for ax in axs.flat:
         ax.label_outer()
-    plt.show()
+    #plt.show()
+    plt.savefig(f"eps_{eps}_{'shishkin' if use_shishkin else 'uniform'}.png")
 
     fig, ax = plt.subplots()
     for err in errs:
         ax.plot(T, err)
-    plt.show()
+    #plt.show()
+    plt.savefig(f"eps_{eps}_{'shishkin' if use_shishkin else 'uniform'}_errors.png")
 
 if __name__ == '__main__':
     #plot_ref()
     
     for eps in [1e-1, 1e-3, 1e-5, 1e-7]:
-        print(f"==== eps={eps}, uniform ====")
+        print(f"### $ \epsilon = {eps} $, Uniform")
         evaluate(False, [2,4,8,16,32], eps)
-        print("===================================")
-        print(f"==== eps={eps}, shishkin ====")
+        print("")
+        print(f"### $ \epsilon = {eps} $, shishkin")
         evaluate(True, [2,4,8,16,32], eps)
-        print("===================================")
+        print("")
