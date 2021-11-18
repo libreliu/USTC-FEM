@@ -176,9 +176,32 @@ $$
 
 记号同上。
 $$
-\int_K f(x, y) \phi_i(x, y) dxdy = 
+\begin{aligned}
+\int_K f(x, y) \phi_i(x, y) dxdy 
+&= \int_K f(x(\xi_1, \xi_2), y(\xi_1, \xi_2)) \phi_i(\xi_1, \xi_2) | \frac{\partial(x, y)}{\partial(\xi_1, \xi_2)} | d\xi_1 d\xi_2 \\
+&= \int_K f(x(\xi_1, \xi_2), y(\xi_1, \xi_2)) \phi_i(\xi_1, \xi_2) \left| 
+\begin{matrix}
+x_1 - x_3 & x_2 - x_3 \\
+y_1 - y_3 & y_2 - y_3
+\end{matrix}
+
+\right| d\xi_1 d\xi_2 \\
+&= \left| 
+\begin{matrix}
+x_1 - x_3 & x_2 - x_3 \\
+y_1 - y_3 & y_2 - y_3
+\end{matrix}
+
+\right|
+ \left\{ \begin{aligned}
+&\int_K f(\xi_1, \xi_2) \xi_i d \xi_1 d\xi_2 & i = 1, 2 \\
+&\int_K f(\xi_1, \xi_2) (1-\xi_1-\xi_2) d \xi_1 d\xi_2 & i = 3
+\end{aligned}
+\right.
+\end{aligned}
 $$
 
+容易观察到积分区域 K 在 $(\xi_1, \xi_2)$ 坐标下是 $ \xi_2 = -\xi_1 + 1 $ 与坐标轴围成的三角形，则在此区域上进行数值积分即可。
 
 ### 算法步骤
 

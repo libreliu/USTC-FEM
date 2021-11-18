@@ -20,6 +20,17 @@ class Mesh2D:
             if self.boundary_marks[idx] == False:
                 self.nodes.append(idx)
 
+    def get_node_local_index(self, pointIdx: int, faceIdx: int):
+        faceVertices = self.fv_indices[faceIdx]
+        if pointIdx == faceVertices[0]:
+            return 0
+        elif pointIdx == faceVertices[1]:
+            return 1
+        elif pointIdx == faceVertices[2]:
+            return 2
+        else:
+            assert(False)
+
     def get_adjacent_elements(self, pointIdx: int):
         adjElems = []
         for elemIdx in range(0, self.num_elements):
