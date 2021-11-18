@@ -208,14 +208,23 @@ $$
 二维问题思考稍显复杂，于是略记如下以飨读者。
 
 1. 计算总自由度 = 所有顶点 - 在边界上的顶点；对于每一个自由度（i.e. 每个自由顶点），都对应着一个基函数 $ \phi_i(x, y) $
-2. 初始化 $ K_{ij} = 0, \forall i, j $
-3. 对每个自由顶点 $ \text{vertex}_i $ 和其对应的基函数 $ \phi_i(x,y) $ 
+
+2. 维护一个双射 $ M: \text{vertex}_i \to i_{M} $  ，$i_M \in \{1, ..., N_f\}$ ，其中 $ N_f $ 为总自由度
+
+   之后更新矩阵的时候，下标 $ K_{ij} $  中的 $ i $ 和 $ j $ 分别为  $ M(\text{vertex}_i) $ 和   $ M(\text{vertex}_j) $ 
+
+3. 初始化 $ K_{ij} = 0, \forall i, j $
+
+4. 对每个自由顶点 $ \text{vertex}_i $ 和其对应的基函数 $ \phi_i(x,y) $ 
    1. $ F_i \leftarrow 0$
    2. 确定影响范围，即找到所有与该顶点临接的三角面，赋值到列表 $ F $
    3. 对于每个 $ F $ 中的面 $ A $
       1.  $ F_i \leftarrow F_i + \int_A f(x, y) \phi_i(x, y) dx $
       2. 寻找面 $A$ 中不为 $ \text{vertex}_i $ 的两个点 $ \text{vertex}_j$ 和  $ \text{vertex}_k$ 
-         1. 若 $ i > j $，跳过计算；否则 $ K_{ij} \leftarrow K_{ij} + \int_A \nabla\phi_j(x, y) \cdot \nabla \phi_i(x, y) dxdy $ 
-         2. 若 $ i > k $，跳过计算；否则 $ K_{ik} \leftarrow K_{ik} + \int_A \nabla\phi_k(x, y) \cdot \nabla \phi_i(x, y) dxdy $ 
+         1. 若 $ i < j $，或者 $ j $ 非自由顶点，则跳过计算；否则 $ K_{ij} \leftarrow K_{ij} + \int_A \nabla\phi_j(x, y) \cdot \nabla \phi_i(x, y) dxdy $ 
+         2. 若 $ i < k $，或者 $ k $ 非自由顶点，则跳过计算；否则 $ K_{ik} \leftarrow K_{ik} + \int_A \nabla\phi_k(x, y) \cdot \nabla \phi_i(x, y) dxdy $ 
       3. $ K_{ii} \leftarrow K_{ii} + \int_A \nabla\phi_i(x, y) \cdot \nabla \phi_i(x, y) dxdy$ 
-4. 解线性方程组 $ \mathrm{KU}=\mathrm{F} $ 得到 $ \mathrm U $ 。
+
+5. 利用对称性把没有填好的 $ K_{ij} $ 中的元素填好
+
+6. 解线性方程组 $ \mathrm{KU}=\mathrm{F} $ 得到 $ \mathrm U $ 

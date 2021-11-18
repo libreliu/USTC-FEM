@@ -1,5 +1,7 @@
-from types import DynamicClassAttribute
+import enum
 import numpy as np
+import pyvista as pv
+import meshPlot
 
 import logging
 logger = logging.getLogger(__name__)
@@ -8,7 +10,7 @@ class Mesh2D:
     def __init__(self, points: np.ndarray, boundary_marks: np.ndarray, fv_indices: np.ndarray):
         self.points = points
         self.num_points = len(self.points)
-        # Boundar markers of points
+        # Boundary markers of points
         self.boundary_marks = boundary_marks
 
         self.num_elements = len(fv_indices)
@@ -20,16 +22,53 @@ class Mesh2D:
             if self.boundary_marks[idx] == False:
                 self.nodes.append(idx)
 
-    def get_node_local_index(self, pointIdx: int, faceIdx: int):
-        faceVertices = self.fv_indices[faceIdx]
-        if pointIdx == faceVertices[0]:
-            return 0
-        elif pointIdx == faceVertices[1]:
-            return 1
-        elif pointIdx == faceVertices[2]:
-            return 2
+    def visualize(self, zData=None):
+        if zData is None:
+            pointsZ = np.zeros((self.num_points, 1), dtype=np.float64)
         else:
-            assert(False)
+            pointsZ = zData
+        points3D = np.hstack((self.points, pointsZ))
+
+        baseData = meshPlot.gen_vis_polydata(points3D, self.fv_indices)
+
+        p = pv.Plotter()
+        p.add_mesh(
+            baseData,
+            **{
+                'color': 'tan',
+                'opacity': 0.5,
+                'style': 'wireframe',
+                'show_edges': True
+            }
+        )
+
+        boundaryLabels = []
+        boundaryPoints3D = []
+        innerLabels = []
+        innerPoints3D = []
+        for idx, label in enumerate(
+            [
+                f"{idx}: ({x:.3}, {y:.3}, {z:.3})" 
+                for idx, (x, y, z) in enumerate(points3D)
+            ]
+        ):
+            if self.boundary_marks[idx] == True:
+                boundaryPoints3D.append(points3D[idx])
+                boundaryLabels.append(label)
+            else:
+                innerPoints3D.append(points3D[idx])
+                innerLabels.append(label)
+
+        p.add_point_labels(
+            boundaryPoints3D, boundaryLabels, point_size=10, font_size=18, text_color="red"
+        )
+        p.add_point_labels(
+            innerPoints3D, innerLabels, point_size=10, font_size=18
+        )
+        p.show()
+
+    def is_boundary_node(self, pointIdx: int):
+        return self.boundary_marks[pointIdx]
 
     def get_adjacent_elements(self, pointIdx: int):
         adjElems = []
@@ -74,6 +113,9 @@ class Mesh2D:
                 elemVi, elemVj, elemVk = int(lineData[1]), int(lineData[2]), int(lineData[3])
 
                 assert(elemIdx == idx)
+                fv_indices[idx, 0] = elemVi
+                fv_indices[idx, 1] = elemVj
+                fv_indices[idx, 2] = elemVk
                 logger.debug(f"- elemIdx={elemIdx}, {elemVi} {elemVj} {elemVk}")
             logger.info(f"numElements: {numElements}")
 

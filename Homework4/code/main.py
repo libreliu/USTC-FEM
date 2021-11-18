@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 import logging, os
-import meshUtil
+from linearFEM import LinearFEM
+import math
 
-def prepare_mesh(meshPrefix):
-    cwd = os.getcwd()
-    meshUtil.Mesh2D.from_easymesh(
-        os.path.join(cwd, f"./meshes/{meshPrefix}.n"),
-        os.path.join(cwd, f"./meshes/{meshPrefix}.e"),
-        os.path.join(cwd, f"./meshes/{meshPrefix}.s")
-    )
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
-    prepare_mesh("gd0")
+    fem = LinearFEM()
+    fem.prepareMesh("gd0")
+    fem.visualize()
+
+    f = lambda x, y: x * (x-1) * math.sin(math.pi * y)
+
+    logger.info("Begin FEM solve()")
+    fem.solve(f)
+    logger.info("FEM solve() finished")
+    fem.visualize()
