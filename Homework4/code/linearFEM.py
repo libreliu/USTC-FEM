@@ -1,4 +1,6 @@
+from ctypes import create_string_buffer
 import logging, os
+from platform import node
 
 import numpy as np
 import meshUtil
@@ -60,6 +62,7 @@ class LinearFEM:
         X = lambda idx: fVCoords[idx-1][0]
         Y = lambda idx: fVCoords[idx-1][1]
         jacobian = (X(1)-X(3))*(Y(2)-Y(3)) - (X(2)-X(3))*(Y(1)-Y(3))
+        print(f"jacob: {jacobian}")
 
         detA = X(1)*Y(2) - X(1)*Y(3) - X(2)*Y(1) + X(2)*Y(3) + X(3)*Y(1) - X(3)*Y(2)
         area = 0.5 * np.abs(detA)
@@ -70,12 +73,45 @@ class LinearFEM:
             xi3 = 1-xi1-xi2
             x = X(1)*xi1 + X(2)*xi2 + X(3)*xi3
             y = Y(1)*xi1 + Y(2)*xi2 + Y(3)*xi3
-            res += f(x, y) * (xi1, xi2, xi3)[nodeLocalIdx]
+            pointVal = f(x, y) * (xi1, xi2, xi3)[nodeLocalIdx]
+            print(f"{faceVertices}: ({xi1}, {xi2}) ({x}, {y}), nodeLocalIdx={nodeLocalIdx} contrib={pointVal}")
+            res += pointVal
         
         res *= jacobian * area / 3
+        print(f"{res}, area={area}")
         return res
 
-    def phiDerivPhiDerivIntg(self, jIdx, iIdx, faceIdx):
+    def phiFIntgDirect(self, f, faceIdx, nodeIdx):
+        # determine nodeLocalIdx: 0~2
+        faceVertices = self.mesh.fv_indices[faceIdx]
+        nodeLocalIdx = None
+        for i in range(0, 3):
+            if faceVertices[i] == nodeIdx:
+                nodeLocalIdx = i
+        assert(nodeLocalIdx != None)
+        fVCoords = []
+
+        for localIdx in range(0, 3):
+            fVCoords.append(self.mesh.points[faceVertices[localIdx]])
+        X = lambda idx: fVCoords[idx-1][0]
+        Y = lambda idx: fVCoords[idx-1][1]
+
+        detA = X(1)*Y(2) - X(1)*Y(3) - X(2)*Y(1) + X(2)*Y(3) + X(3)*Y(1) - X(3)*Y(2)
+        area = 0.5 * np.abs(detA)
+
+        res = 0
+        for adjV in range(0, 3):
+            if adjV == nodeLocalIdx:
+                continue
+            res += f((X(adjV+1) + X(nodeLocalIdx+1))/ 2, (Y(adjV+1)+Y(nodeLocalIdx+1)) /2)
+        # res = res * area / 3 * 0.5
+        res = res * area / 3 * 0.5
+        print(f"{faceVertices}: nodeLocalIdx={nodeLocalIdx}, {res}, area={area}")
+        return res
+
+    def phiDerivPhiDerivIntg(self, jGIdx, iGIdx, faceIdx):
+        jIdx = self.free_map[jGIdx]
+        iIdx = self.free_map[iGIdx]
         assert(iIdx >= jIdx)
 
         faceVertices = self.mesh.fv_indices[faceIdx]
@@ -93,8 +129,8 @@ class LinearFEM:
         X = lambda idx: fVCoords[idx-1][0]
         Y = lambda idx: fVCoords[idx-1][1]
 
-        jLIdx = getLocalIndex(faceVertices, jIdx)
-        iLIdx = getLocalIndex(faceVertices, iIdx)
+        jLIdx = getLocalIndex(faceVertices, jGIdx)
+        iLIdx = getLocalIndex(faceVertices, iGIdx)
 
         detA = X(1)*Y(2) - X(1)*Y(3) - X(2)*Y(1) + X(2)*Y(3) + X(3)*Y(1) - X(3)*Y(2)
         area = 0.5 * np.abs(detA)
@@ -106,7 +142,7 @@ class LinearFEM:
             (2, 2): (Y(3)-Y(1))**2 + (X(1)-X(3))**2,
             (2, 3): (Y(3)-Y(1))*(Y(1)-Y(2)) + (X(1)-X(3))*(X(2)-X(1)),
             (3, 3): (Y(1)-Y(2))**2 + (X(2)-X(1))**2,
-        }[(jLIdx+1, iLIdx+1)]
+        }[tuple(sorted((jLIdx+1, iLIdx+1)))]
         
         return res
 
@@ -115,26 +151,26 @@ class LinearFEM:
         numNodes = len(self.mesh.nodes)
         K = np.zeros((numNodes, numNodes), dtype=np.float64)
         F = np.zeros((numNodes,), dtype=np.float64)
-
+        #print(self.mesh.nodes)
         for nodeIdx in self.mesh.nodes:
             neighFaces = self.mesh.get_adjacent_elements(nodeIdx)
             for faceIdx in neighFaces:
                 # compute F_i
-                F[self.free_map[nodeIdx]] += self.phiFIntg(f, faceIdx, nodeIdx)
+                F[self.free_map[nodeIdx]] += self.phiFIntgDirect(f, faceIdx, nodeIdx)
 
                 adjNodeIdxList = []
                 faceVertices = self.mesh.fv_indices[faceIdx]
                 for vIdx in faceVertices:
                     if vIdx != nodeIdx:
-                        adjNodeIdxList.append(nodeIdx)
+                        adjNodeIdxList.append(vIdx)
                 assert(len(adjNodeIdxList) == 2)
 
                 for adjNodeIdx in adjNodeIdxList:
                     if self.mesh.is_boundary_node(adjNodeIdx):
-                        pass
+                        continue
 
-                    if nodeIdx < adjNodeIdx:
-                        pass
+                    if self.free_map[nodeIdx] < self.free_map[adjNodeIdx]:
+                        continue
 
                     K[self.free_map[nodeIdx], self.free_map[adjNodeIdx]] += self.phiDerivPhiDerivIntg(adjNodeIdx, nodeIdx, faceIdx)
 
@@ -142,7 +178,13 @@ class LinearFEM:
                 
                 K[self.free_map[nodeIdx], self.free_map[nodeIdx]] += self.phiDerivPhiDerivIntg(nodeIdx, nodeIdx, faceIdx)
         
+        np.set_printoptions(precision=3, linewidth=150)
+        print(K)
+        print(F)
+        # F = np.asarray([0.4312, 0.3011, 0.3011, 0.4312])
+
         self.U = np.linalg.solve(K, F)
+        print(self.U)
 
         chk = K @ self.U
         assert(np.allclose(chk, F))

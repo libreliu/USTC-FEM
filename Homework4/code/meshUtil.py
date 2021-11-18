@@ -60,10 +60,10 @@ class Mesh2D:
                 innerLabels.append(label)
 
         p.add_point_labels(
-            boundaryPoints3D, boundaryLabels, point_size=10, font_size=18, text_color="red"
+            boundaryPoints3D, boundaryLabels, point_size=5, font_size=9, text_color="red"
         )
         p.add_point_labels(
-            innerPoints3D, innerLabels, point_size=10, font_size=18
+            innerPoints3D, innerLabels, point_size=5, font_size=9
         )
         p.show()
 
