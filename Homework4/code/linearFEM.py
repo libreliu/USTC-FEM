@@ -3,6 +3,7 @@ import logging, os
 from platform import node
 
 import numpy as np
+import math
 import meshUtil
 
 logger = logging.getLogger(__name__)
@@ -190,3 +191,63 @@ class LinearFEM:
         assert(np.allclose(chk, F))
 
         return self.U
+
+    def getSolvedValueBarycentric(self, faceIdx, xi1, xi2, xi3):
+        faceVertices = self.mesh.fv_indices[faceIdx]
+        localBasisVal = []
+        for localIdx in range(0, 3):
+            if faceVertices[localIdx] in self.free_map:
+                localBasisVal.append(self.U[self.free_map[faceVertices[localIdx]]])
+            else:
+                localBasisVal.append(0.0)
+        
+        return xi1 * localBasisVal[0] + xi2 * localBasisVal[1] + xi3 * localBasisVal[2]
+
+    def errorAnalysisBarycentric(self, u_ref, samplesPerCell=100):
+        """Returns error w.r.t L1 norm and Linf norm evaluated on each cell"""
+        samplePerEdge = math.ceil(math.sqrt(samplesPerCell))
+
+        err_Linf = 0
+        err_L2 = 0
+        errs = []
+
+        for faceIdx in range(0, self.mesh.num_elements):
+            err_L2_local = 0
+            faceVertices = self.mesh.fv_indices[faceIdx]
+            fVCoords = []
+
+            for localIdx in range(0, 3):
+                fVCoords.append(self.mesh.points[faceVertices[localIdx]])
+            
+            X = lambda idx: fVCoords[idx-1][0]
+            Y = lambda idx: fVCoords[idx-1][1]
+
+            # sample uniformly on barycentric coordinate
+            samplePoints = []
+            bStep = 1.0 / (samplePerEdge - 1)
+            for sampleIdxX in range(0, samplePerEdge):
+                for sampleIdxY in range(0, samplePerEdge - sampleIdxX):
+                    xi1 = bStep * sampleIdxX
+                    xi2 = bStep * sampleIdxY
+                    xi3 = 1 - xi1 - xi2
+                    assert(xi3 <= 1)
+                    samplePoints.append((xi1, xi2, xi3))
+
+            for (xi1, xi2, xi3) in samplePoints:
+                x = X(1)*xi1 + X(2)*xi2 + X(3)*xi3
+                y = Y(1)*xi1 + Y(2)*xi2 + Y(3)*xi3
+                ref_val = u_ref(x, y)
+                my_val = self.getSolvedValueBarycentric(faceIdx, xi1, xi2, xi3)                    
+        
+                errs.append((x, y, ref_val - my_val))
+                err_Linf = max(abs(ref_val - my_val), err_Linf)
+                err_L2_local += abs(ref_val - my_val)
+            
+            detA = X(1)*Y(2) - X(1)*Y(3) - X(2)*Y(1) + X(2)*Y(3) + X(3)*Y(1) - X(3)*Y(2)
+            area = 0.5 * np.abs(detA)
+
+            err_L2 += area * err_L2_local
+
+        return (errs, err_Linf, err_L2)
+
+
