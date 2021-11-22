@@ -8,10 +8,13 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+def get_order(errk, errkP1, Ek, EkP1):
+    return 2 * (math.log(errk / errkP1)) / (math.log(EkP1 / Ek))
+
 def evaluate():
     meshes = [f"gd{i}" for i in range(0, 5)]
 
-    trials = {}
+    trials = []
     for mesh in meshes:
         fem = LinearFEM()
         fem.prepareMesh(mesh)
@@ -24,15 +27,62 @@ def evaluate():
 
         _, err_Linf_bary, err_L2_bary = fem.errorAnalysisBarycentric(u, 16)
 
-        (X, Y, Z), err_Linf_uni, err_L2_uni = fem.errorAnalysisUniform(u, 100)
+        (X, Y, Z), err_Linf_uni, err_L2_uni = (1,2,3), 1, 1
+        #(X, Y, Z), err_Linf_uni, err_L2_uni = fem.errorAnalysisUniform(u, 100)
         
-        # Visualize
-        fig, ax = plt.subplots()
-        im = ax.imshow(np.abs(Z), interpolation='bilinear', origin='lower')
-        
-        CBI = fig.colorbar(im)
+        trials.append({
+            'name': mesh,
+            'faceCount': faceCount,
+            'err_Linf_bary': err_Linf_bary,
+            'err_L2_bary': err_L2_bary,
+            'err_Linf_uni': err_Linf_uni,
+            'err_L2_uni': err_L2_uni,
+        })
 
-        plt.show()
+        # Visualize
+        # fig, ax = plt.subplots()
+        # im = ax.imshow(np.abs(Z), interpolation='bilinear', origin='lower')
+
+        # CBI = fig.colorbar(im)
+
+        # plt.show()
+
+    for idx, trial in enumerate(trials):
+        if idx == 0:
+            EkP1 = trial['faceCount']
+            ord_Linf_bary = 'N/A'
+            ord_L2_bary = 'N/A'
+            ord_Linf_uni = 'N/A'
+            ord_L2_uni = 'N/A'
+        else:
+            Ek = trials[idx - 1]['faceCount']
+            EkP1 = trial['faceCount']
+            ord_Linf_bary = get_order(
+                trials[idx-1]['err_Linf_bary'],
+                trials[idx]['err_Linf_bary'],
+                Ek,
+                EkP1
+            )
+            ord_L2_bary = get_order(
+                trials[idx-1]['err_L2_bary'],
+                trials[idx]['err_L2_bary'],
+                Ek,
+                EkP1
+            )
+            ord_Linf_uni = get_order(
+                trials[idx-1]['err_Linf_uni'],
+                trials[idx]['err_Linf_uni'],
+                Ek,
+                EkP1
+            )
+            ord_L2_uni = get_order(
+                trials[idx-1]['err_L2_bary'],
+                trials[idx]['err_L2_bary'],
+                Ek,
+                EkP1
+            )
+
+        print(f"|{EkP1}|{trials[idx]['err_Linf_bary']}|{trials[idx]['err_L2_bary']}|{ord_Linf_bary}|{ord_L2_bary}|")
 
 
 
