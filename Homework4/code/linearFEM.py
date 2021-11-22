@@ -46,6 +46,7 @@ class LinearFEM:
         else:
             self.mesh.visualize()
 
+    # KNOWN ISSUE: THIS IS BUGGY, USE DIRECT METHOD INSTEAD
     def phiFIntg(self, f, faceIdx, nodeIdx):
         # determine nodeLocalIdx: 0~2
         faceVertices = self.mesh.fv_indices[faceIdx]
@@ -107,7 +108,7 @@ class LinearFEM:
             res += f((X(adjV+1) + X(nodeLocalIdx+1))/ 2, (Y(adjV+1)+Y(nodeLocalIdx+1)) /2)
         # res = res * area / 3 * 0.5
         res = res * area / 3 * 0.5
-        print(f"{faceVertices}: nodeLocalIdx={nodeLocalIdx}, {res}, area={area}")
+        #print(f"{faceVertices}: nodeLocalIdx={nodeLocalIdx}, {res}, area={area}")
         return res
 
     def phiDerivPhiDerivIntg(self, jGIdx, iGIdx, faceIdx):
@@ -179,13 +180,12 @@ class LinearFEM:
                 
                 K[self.free_map[nodeIdx], self.free_map[nodeIdx]] += self.phiDerivPhiDerivIntg(nodeIdx, nodeIdx, faceIdx)
         
-        np.set_printoptions(precision=3, linewidth=150)
-        print(K)
-        print(F)
-        # F = np.asarray([0.4312, 0.3011, 0.3011, 0.4312])
+        #np.set_printoptions(precision=3, linewidth=150)
+        #print(K)
+        #print(F)
 
         self.U = np.linalg.solve(K, F)
-        print(self.U)
+        #print(self.U)
 
         chk = K @ self.U
         assert(np.allclose(chk, F))
@@ -202,6 +202,36 @@ class LinearFEM:
                 localBasisVal.append(0.0)
         
         return xi1 * localBasisVal[0] + xi2 * localBasisVal[1] + xi3 * localBasisVal[2]
+
+    def errorAnalysisUniform(self, u_ref, samplePerAxis):	
+        x = np.linspace(0, 1, samplePerAxis)
+        y = np.linspace(0, 1, samplePerAxis)
+
+        # https://stackoverflow.com/questions/36013063/what-is-the-purpose-of-meshgrid-in-python-numpy
+        XX, YY = np.meshgrid(x, y)
+        Z = np.ndarray((samplePerAxis, samplePerAxis), dtype=np.float64)
+
+        err_Linf = 0
+        err_L2 = 0
+
+        for xIdx in range(0, samplePerAxis):
+            for yIdx in range(0, samplePerAxis):
+                gridX = XX[yIdx][xIdx]
+                gridY = YY[yIdx][xIdx]
+
+                # check which triangle are we in
+                faceIdx, xi1, xi2, xi3 = self.mesh.check_inner(gridX, gridY)
+
+                # -- interpolate --
+                my_val = self.getSolvedValueBarycentric(faceIdx, xi1, xi2, xi3)
+                ref_val = u_ref(gridX, gridY)
+                Z[yIdx][xIdx] = my_val - ref_val
+
+                err = np.abs(my_val - ref_val)
+                err_Linf = max(err_Linf, err)
+                
+        
+        return ((XX, YY, Z), err_Linf, err_L2)
 
     def errorAnalysisBarycentric(self, u_ref, samplesPerCell=100):
         """Returns error w.r.t L1 norm and Linf norm evaluated on each cell"""
@@ -249,5 +279,4 @@ class LinearFEM:
             err_L2 += area * err_L2_local
 
         return (errs, err_Linf, err_L2)
-
 

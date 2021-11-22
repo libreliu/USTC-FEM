@@ -22,6 +22,33 @@ class Mesh2D:
             if self.boundary_marks[idx] == False:
                 self.nodes.append(idx)
 
+    def check_inner(self, px, py):
+        def clamp(x):
+            if x >= 1:
+                return 1.0
+            elif x <= 0:
+                return 0.0
+            else:
+                return x
+
+        for faceIdx, verts in enumerate(self.fv_indices):
+            fVCoords = []
+            for vertIdx in verts:
+                fVCoords.append(self.points[vertIdx])
+        
+            # Convert to barycentric coord
+            X = lambda idx: fVCoords[idx-1][0]
+            Y = lambda idx: fVCoords[idx-1][1]
+            detA = X(1)*Y(2) - X(1)*Y(3) - X(2)*Y(1) + X(2)*Y(3) + X(3)*Y(1) - X(3)*Y(2)
+
+            xi1 = (1.0 / detA) * ((Y(2)-Y(3)) * px + (X(3)-X(2)) * py + (X(2)*Y(3)-X(3)*Y(2)) * 1)
+            xi2 = (1.0 / detA) * ((Y(3)-Y(1)) * px + (X(1)-X(3)) * py + (X(3)*Y(1)-X(1)*Y(3)) * 1)
+            eps = 1e-7
+            if 0 - eps <= xi1 <= 1 + eps and 0- eps  <= xi2 <= 1+ eps and 0 - eps<= (1-xi1-xi2) <= 1+ eps:
+                return (faceIdx, clamp(xi1), clamp(xi2), clamp(1-xi1-xi2))
+        
+        raise Exception(f"Given point ({px},{py}) is not in mesh")
+
     def visualize(self, zData=None):
         if zData is None:
             pointsZ = np.zeros((self.num_points, 1), dtype=np.float64)
