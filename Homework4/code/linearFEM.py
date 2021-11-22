@@ -230,7 +230,10 @@ class LinearFEM:
                 err = np.abs(my_val - ref_val)
                 err_Linf = max(err_Linf, err)
                 
+                # TODO: implement err_L2
+                err_L2 += err**2
         
+        err_L2 = np.sqrt(err_L2)
         return ((XX, YY, Z), err_Linf, err_L2)
 
     def errorAnalysisBarycentric(self, u_ref, samplesPerCell=100):
@@ -271,12 +274,13 @@ class LinearFEM:
         
                 errs.append((x, y, ref_val - my_val))
                 err_Linf = max(abs(ref_val - my_val), err_Linf)
-                err_L2_local += abs(ref_val - my_val)
+                err_L2_local += abs(ref_val - my_val) ** 2
             
             detA = X(1)*Y(2) - X(1)*Y(3) - X(2)*Y(1) + X(2)*Y(3) + X(3)*Y(1) - X(3)*Y(2)
             area = 0.5 * np.abs(detA)
 
             err_L2 += area * err_L2_local
 
+        err_L2 = np.sqrt(err_L2)
         return (errs, err_Linf, err_L2)
 
