@@ -29,3 +29,56 @@
 ## 编写计划
 
 ddl 好多..争取每周一章？要不然都堆到期末肯定要 gg，我们还有两个月就期末了
+
+## 第零章
+
+## 第一章
+
+
+### Minkowski's Inequality
+对于 $ 1 \le p \le \infty $ 和 $ f, g \in L^p(\Omega) $ 有  
+
+$$
+|| f+g || _{L^p(\Omega)} \le || f || _{L^p(\Omega)} + || g || _{L_p(\Omega)}
+$$
+
+证明：
+
+### Holder's Inequality
+对于 $ 1 \le p,q \le \infty $ 使得 $ 1 = 1/p + 1/q $，如果 $ f \in L^p(\Omega) $ 且 $ g \in L^q(\Omega) $，则有
+
+$$
+|| fg || _L^1(\Omega) \le || f || _{L^p(\Omega)} || g || _{L^q(\Omega)}
+$$
+
+证明：
+
+### Schwarz's Inequality
+
+就是 $ p = q = 2 $ 的 Holder 不等式
+
+$$
+\int_{\Omega} | f(x) g(x) | dx \le || f || _{L^2(\Omega)} || g || _{L^2(\Omega)}
+$$
+
+> 其实是内积空间的常用结论 $ |(x, y)|^2 \le (x, x) (y, y) $，如果利用 $ L^2 $ 范数定义 $ L^2 $ 内积的话
+
+证明：
+
+### $ L^2 $ 范数诱导的 $ L^2 $ 内积
+
+首先，我们知道
+
+### 内积诱导的范数
+
+## 第二章
+
+
+
+## 第三章
+
+## 第四章
+
+## 第五章
+
+## 第六章
