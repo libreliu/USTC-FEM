@@ -31,8 +31,7 @@ def intgWrapper(useIntg, refIntg):
         return use
     return intg
 
-
-class PiecewiseLinearFEM:
+class linearFEM:
     def __init__(self, intg: 'function'):
         """
         @param intg: Numerical integrater to use
@@ -248,6 +247,14 @@ class PiecewiseLinearFEM:
         
         self.U = U
 
+    def solveMG(self, f: 'function'):
+        pass
+
+    def MG(self, k, z_0, g):
+        """k'th MultiGrid; z_0: """
+        pass
+
+
     def genSample(self, n):
         T = np.linspace(0, 1, n)
         res = np.zeros((n,), dtype=np.double)
@@ -286,7 +293,7 @@ if __name__ == '__main__':
 
     fig, ax = plt.subplots()
 
-    CGFEM = PiecewiseLinearFEM(gaussIntg)
+    CGFEM = linearFEM(gaussIntg)
     CGFEM.build_knots(5)
     CGFEM.solveCG(f)
 
