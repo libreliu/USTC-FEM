@@ -194,7 +194,7 @@ class PiecewiseLinearFEM:
         n = self.n
         for i in range(0, n-1):
             # candidate: i-1, i, i+1
-            for j in range(i-1, i+1):
+            for j in range(i-1, i+2):
                 if j >= 0 and j <= n-2:
                     yield (i, j)
 
@@ -206,7 +206,7 @@ class PiecewiseLinearFEM:
         # only do on non-sparse items
         # TODO: use symmetry
         res = np.double(0.0)
-        for i, j in self.nonZeroEntries:
+        for i, j in self.nonZeroEntries():
             a_ij = self.phiDerivPhiDerivIntg(i + 1, j + 1)
             res += a_ij * left[i] * right[j]
 
@@ -218,7 +218,7 @@ class PiecewiseLinearFEM:
         assert(len(right) == n-1)
 
         res = np.zeros((n-1,), dtype=np.double)
-        for i, j in self.nonZeroEntries:
+        for i, j in self.nonZeroEntries():
             a_ij = self.phiDerivPhiDerivIntg(i + 1, j + 1)
             res[i] += a_ij * right[j]
         
@@ -274,6 +274,31 @@ class PiecewiseLinearFEM:
         ax.plot(T, res)
 
 
+def plot_ref(ax, ref_func):
+    x = np.linspace(0, 1, 100)
+    ref = [val for val in map(ref_func, x)]
+
+    ax.plot(x, ref)
+
 if __name__ == '__main__':
-    #plot_ref()
-    pass
+    f = lambda x: (x-1) * math.sin(x)
+    u_ref = lambda x: (x-1) * math.sin(x) + 2 * math.cos(x) + (2 - 2 * math.cos(1))* x - 2
+
+    fig, ax = plt.subplots()
+
+    CGFEM = PiecewiseLinearFEM(gaussIntg)
+    CGFEM.build_knots(5)
+    CGFEM.solveCG(f)
+
+
+    CGFEM.plot(50, ax)
+
+    # directFEM = PiecewiseLinearFEM(gaussIntg)
+    # directFEM.build_knots(5)
+    # directFEM.solve(f)
+
+    # directFEM.plot(50, ax)
+
+    plot_ref(ax, u_ref)
+
+    plt.show()
