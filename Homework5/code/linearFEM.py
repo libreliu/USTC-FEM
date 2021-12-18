@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import math
+import math, time
 #import scipy.integrate as integrate
 
 def simpsonIntg(f, x0, x1):
@@ -252,6 +252,7 @@ class linearFEM:
         r = -F
         d = -r
 
+        numIter = 0
         while np.linalg.norm(r, ord=2) > threshold:
             dT_A_d = self.computeInnerProduct(k, d, d)
             U_correction = np.dot(r, r) / dT_A_d * d
@@ -259,16 +260,155 @@ class linearFEM:
 
             r = self.computeMatrixProduct(k, U) - F
             d = -r + (self.computeInnerProduct(k, r, d) / dT_A_d * d)
+            numIter += 1
+        
+        print(f"solveCG: done with {numIter} iterations")
         
         self.U[k] = U
 
-    def solveMG(self, f: 'function'):
-        pass
+    def iterateCG(self, k, z_0, g, numIter):
+        """compute A_k z = g using CG; use z_0 as initial value"""
+        r = -g + self.computeMatrixProduct(k, z_0)
+        d = -r
+        Z = z_0
 
-    def MG(self, k, z_0, g):
+        for i in range(0, numIter):
+            dT_A_d = self.computeInnerProduct(k, d, d)
+            Z_correction = np.dot(r, r) / dT_A_d * d
+            Z += Z_correction
+
+            r = self.computeMatrixProduct(k, Z) - g
+
+            # Exit in time, since r == 0 will lead to d = 0,
+            # and Z_correction will blow up
+            if np.allclose(r, np.zeros_like(r)):
+                return Z
+
+            d = -r + (self.computeInnerProduct(k, r, d) / dT_A_d * d)
+        
+        return Z
+
+    def coarseToFine(self, k_coarse, z_coarse):
+        """Bring k_coarse -> k_coarse + 1"""
+        assert(len(self.n) > k_coarse + 1)
+        nCoarse = self.n[k_coarse]
+        nFine = self.n[k_coarse + 1]
+
+        assert(len(z_coarse) == nCoarse - 1)
+        z_fine = np.zeros((nFine-1,), dtype=np.double)
+        
+        for i in range(0, nFine-1):
+            if i % 2 == 0:
+                rightNode = i // 2
+                leftNode = rightNode - 1
+                rightVal = z_coarse[rightNode] \
+                    if rightNode < nCoarse - 1 \
+                    else 0
+                leftVal = z_coarse[leftNode] \
+                    if leftNode >= 0         \
+                    else 0
+                
+                z_fine[i] = 0.5 * rightVal + 0.5 * leftVal
+            else:
+                z_fine[i] = z_coarse[(i - 1) // 2]
+        
+        return z_fine
+
+    def fineToCoarse(self, k_fine, z_fine):
+        """Bring k_fine -> k_fine - 1"""
+        assert(k_fine >= 1)
+        nFine = self.n[k_fine]
+        nCoarse = self.n[k_fine - 1]
+
+        assert(len(z_fine) == nFine - 1)
+        z_coarse = np.zeros((nCoarse-1), dtype=np.double)
+
+        for i in range(0, nCoarse-1):
+            centerNode = i * 2 + 1
+            leftNode = centerNode - 1
+            rightNode = centerNode + 1
+
+            # TODO: figure out correct interpolation operator
+            z_coarse[i] = z_fine[centerNode]
+            z_coarse[i] += 0.5 * z_fine[leftNode]
+            z_coarse[i] += 0.5 * z_fine[rightNode]
+        
+        return z_coarse
+
+    def solveMG(self, f: 'function', r=1, p=1):
+        kMax = len(self.n)
+        # or we'd not having any basis functions
+        assert(self.n[0] >= 2)
+
+        self.U[0] = np.zeros((self.n[0]-1), dtype=np.double)
+        for k in range(0, kMax):
+            if k != 0:
+                self.U[k] = self.coarseToFine(k-1, self.U[k-1])
+            
+            # construct F_k
+            F_k = np.zeros((self.n[k]-1, ), dtype=np.double)
+            for i in range(0, self.n[k]-1):
+                F_k[i] = self.phiFIntg(k, i+1, f)
+
+            self.U[k] = self.MG(k, self.U[k], F_k, p)
+            # self.U[k] = self.MGDirect(k, self.U[k], F_k, p)
+            # self.U[k] = self.MGCGDirect(k, self.U[k], F_k, p)
+
+        return self.U[kMax - 1]
+
+    def MG(self, k, z_0, g, p=1):
         """k'th MultiGrid; z_0: """
-        if k == 1:
-            pass
+        n = self.n[k]
+        assert(len(z_0) == n-1)
+        assert(len(g) == n-1)
+        z = z_0
+
+        if k == 0:
+            # A_0 ans = g
+            # solve with CG
+            A = np.zeros((n-1, n-1), dtype=np.double)
+            for i, j in self.nonZeroEntries(k):
+                A[i, j] = self.phiDerivPhiDerivIntg(k, i + 1, j + 1)
+            res = np.linalg.solve(A, g)
+            assert(np.allclose(A @ res, g))
+            return res
+
+        # Presmoothing
+        z = self.iterateCG(k, z, g, 1)
+
+        # Error correction
+        g_bar = g - self.computeMatrixProduct(k, z)
+        g_bar = self.fineToCoarse(k, g_bar)
+
+        q = np.zeros((self.n[k-1] - 1,), dtype=np.double)
+        for i in range(0, p):
+            q = self.MG(k-1, q, g_bar, p)
+        
+        q_fine = self.coarseToFine(k-1, q)
+        z += q_fine
+        
+        # Postsmoothing
+        z = self.iterateCG(k, z, g, 1)
+
+        return z
+    
+    def MGDirect(self, k, z_0, g, p=1):
+        """Solve using direct method, as reference"""
+        n = self.n[k]
+        A = np.zeros((n-1, n-1), dtype=np.double)
+        for i, j in self.nonZeroEntries(k):
+            A[i, j] = self.phiDerivPhiDerivIntg(k, i + 1, j + 1)
+        
+        z = np.linalg.solve(A, g)
+        assert(np.allclose(A @ z, g))
+        return z
+
+    def MGCGDirect(self, k, z_0, g, p=1):
+        """Solve using iterateCG, as reference"""
+        z = z_0
+        z = self.iterateCG(k, z, g, 10)
+
+        return z
 
     def genSample(self, k, n):
         T = np.linspace(0, 1, n)
@@ -294,6 +434,27 @@ class linearFEM:
         # only works for uniform spacing
         T, res = self.genSample(k, n)
         ax.plot(T, res)
+    
+    def estimateError(self, k, u_ref, err_samples=1000):
+        T, res = self.genSample(k, err_samples)
+        resReal = np.zeros((err_samples,), dtype=np.double)
+
+        for i in range(0, err_samples):
+            resReal[i] = u_ref(T[i])
+        
+        err = np.abs(resReal - res)
+        
+        err_L1 = 0
+        err_Linf = 0
+        for i in range(1, err_samples):
+            h = T[i] - T[i-1]
+            # integrate using trapz scheme
+            err_L1 += h * abs(0.5 * err[i] + 0.5 * err[i-1])
+            if err_Linf < abs(err[i]):
+                err_Linf = abs(err[i])
+        
+        return (err_L1, err_Linf)
+
 
 
 def plot_ref(ax, ref_func):
@@ -308,18 +469,85 @@ if __name__ == '__main__':
 
     fig, ax = plt.subplots()
 
-    CGFEM = linearFEM(gaussIntg)
-    CGFEM.build_knots(5)
-    CGFEM.solveCG(0, f)
-
-    CGFEM.plot(0, 50, ax)
+    # CGFEM = linearFEM(gaussIntg)
+    # CGFEM.build_knots(5)
+    # CGFEM.solveCG(0, f)
+    # CGFEM.plot(0, 50, ax)
 
     # directFEM = linearFEM(gaussIntg)
     # directFEM.build_knots(5)
     # directFEM.solve(0, f)
-
     # directFEM.plot(0, 50, ax)
 
-    plot_ref(ax, u_ref)
+    previous_n = None
+    previous_L1 = None
+    previous_Linf = None
+    previous_mg_solve_time = None
+    MG_n_used = []
+    for numLayers in range(2, 11):
+        MGFEM = linearFEM(gaussIntg)
+        MGFEM.build_knots_multigrid(numLayers, 2)
+        MGFEM_nMax = MGFEM.n[-1]
+        MGFEM_kMax = len(MGFEM.n) - 1
+        assert(numLayers == MGFEM_kMax + 1)
 
-    plt.show()
+        mg_solve_start = time.perf_counter()
+        MGFEM.solveMG(f, 1, 1)
+        mg_solve_end = time.perf_counter()
+        mg_solve_time = mg_solve_end - mg_solve_start
+        
+        err_L1, err_Linf = MGFEM.estimateError(MGFEM_kMax, u_ref, MGFEM_nMax * 3 * 7)
+        #MGFEM.plot(MGFEM_kMax, 1000, ax)
+
+        err_L1_order = 0 \
+            if previous_L1 is None \
+            else math.log(previous_L1 / err_L1, MGFEM_nMax / previous_n)
+        err_Linf_order = 0 \
+            if previous_Linf is None \
+            else math.log(previous_Linf / err_Linf, MGFEM_nMax / previous_n)
+        mg_solve_order = 0 \
+            if previous_mg_solve_time is None \
+            else math.log(mg_solve_time / previous_mg_solve_time, MGFEM_nMax / previous_n)
+
+        print(f"| {numLayers} | {MGFEM_nMax} | {err_L1:.3e} | {err_Linf:.3e} | {err_L1_order:.3f} | {err_Linf_order:.3f} | {mg_solve_time:.3e} | {mg_solve_order:.3f} |")
+        previous_n = MGFEM_nMax
+        previous_L1 = err_L1
+        previous_Linf = err_Linf
+        previous_mg_solve_time = mg_solve_time
+        MG_n_used.append(MGFEM_nMax)
+
+    previous_n = None
+    previous_L1 = None
+    previous_Linf = None
+    previous_cg_solve_time = None
+    for n in MG_n_used:
+        CGFEM = linearFEM(gaussIntg)
+        CGFEM.build_knots(n)
+
+        cg_solve_start = time.perf_counter()
+        CGFEM.solveCG(0, f, 1e-7)
+        cg_solve_end = time.perf_counter()
+        cg_solve_time = cg_solve_end - cg_solve_start
+
+        err_L1, err_Linf = CGFEM.estimateError(0, u_ref, n * 3 * 7)
+        #MGFEM.plot(MGFEM_kMax, 1000, ax)
+
+        err_L1_order = 0 \
+            if previous_L1 is None \
+            else math.log(previous_L1 / err_L1, n / previous_n)
+        err_Linf_order = 0 \
+            if previous_Linf is None \
+            else math.log(previous_Linf / err_Linf, n / previous_n)
+        cg_solve_order = 0 \
+            if previous_cg_solve_time is None \
+            else math.log(cg_solve_time / previous_cg_solve_time, n / previous_n)
+
+        print(f"| {n} | {err_L1:.3e} | {err_Linf:.3e} | {err_L1_order:.3f} | {err_Linf_order:.3f} | {cg_solve_time:.3e} | {cg_solve_order:.3f} |")
+        previous_n = n
+        previous_L1 = err_L1
+        previous_Linf = err_Linf
+        previous_cg_solve_time = cg_solve_time
+
+    #plot_ref(ax, u_ref)
+
+    #plt.show()
