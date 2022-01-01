@@ -262,7 +262,7 @@ def evaluate(use_shishkin: bool, n_list, epsilon):
         ref_func = lambda x: (2*epsilon+1)/(2-2*math.exp(1/epsilon))*(math.exp(x/epsilon)-1) + 0.5 * x**2 + epsilon*x
     else:
         # TODO: make small epsilon approximation
-        ref_func = lambda x: -math.exp((x-1)/epsilon)*(2*epsilon+1) + 0.5 * x**2 + epsilon*x
+        ref_func = lambda x: -math.exp((x-1)/epsilon)*(epsilon+1/2) + 0.5 * x**2 + epsilon*x
 
     fig, axs = plt.subplots(1, len(n_list), figsize=(17,3))
     errs = []
