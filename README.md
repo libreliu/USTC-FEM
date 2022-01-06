@@ -11,12 +11,12 @@
 
 ## 实验列表
 
-1. 分别用分片一次多项式和分片二次多项式求解 1D Poisson 问题 ([报告](Homework1/report/README.md))
-2. 分别用分片一次多项式和分片二次多项式求解 1D 耗散-反应方程 ([报告](Homework2/report/README.md))
-3. 利用分片一次多项式，分别用均匀网格划分和 Shishkin 网格划分求解 1D 问题 -ϵu''(x)+u'(x)=x ([报告](Homework3/report/README.md))
-4. 在非均匀网格和分片一次多项式空间上求解 2D Poisson 问题 ([报告](Homework4/report/README.md))
-5. 使用并对比多重网格 (Multigrid) 方法和共轭梯度方法求解 1D Poisson 问题 ([报告](Homework5/report/README.md))
-6. Streamline-Diffusion 方法和分片一次多项式求解 1D 耗散-反应方程 ([报告](Homework6/report/README.md))
+1. 分别用分片一次多项式和分片二次多项式求解 1D Poisson 问题 ([Markdown 报告](Homework1/report/README.md))
+2. 分别用分片一次多项式和分片二次多项式求解 1D 耗散-反应方程 ([Markdown 报告](Homework2/report/README.md))
+3. 利用分片一次多项式，分别用均匀网格划分和 Shishkin 网格划分求解 1D 问题 -ϵu''(x)+u'(x)=x ([Markdown 报告](Homework3/report/README.md))
+4. 在非均匀网格和分片一次多项式空间上求解 2D Poisson 问题 ([Markdown 报告](Homework4/report/README.md))
+5. 使用并对比多重网格 (Multigrid) 方法和共轭梯度方法求解 1D Poisson 问题 ([Markdown 报告](Homework5/report/README.md))
+6. Streamline-Diffusion 方法和分片一次多项式求解 1D 耗散-反应方程 ([Markdown 报告](Homework6/report/README.md))
 
 ## 复习笔记
 
